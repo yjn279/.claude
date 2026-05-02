@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "p=$(jq -r '.prompt // empty' 2>/dev/null); case \"$p\" in /trinity*) if ! git rev-parse --git-dir >/dev/null 2>&1; then echo 'trinity: not inside a git repository.' >&2; exit 2; fi; if [ -n \"$(git status --porcelain)\" ]; then echo 'trinity: working tree is dirty. Commit or stash before /trinity.' >&2; exit 2; fi; printf 'trinity: starting on branch %s\\n' \"$(git rev-parse --abbrev-ref HEAD)\" >&2 ;; esac"
+            "command": "p=$(jq -r '.prompt // empty' 2>/dev/null); case \"$p\" in /trinity*) if ! git rev-parse --git-dir >/dev/null 2>&1; then echo 'trinity: not inside a git repository.' >&2; exit 2; fi; printf 'trinity: starting (current branch %s, worktree will be based on origin/main)\\n' \"$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)\" >&2 ;; esac"
           }
         ]
       }

@@ -35,14 +35,19 @@ run ディレクトリを切る前に、Claude の `AskUserQuestion` ツール�
 `UserPromptSubmit` hook が `/trinity` を検出したとき次を強制する。あなたはこれを再実装しない。
 
 - カレントが git リポジトリであること
-- ワーキングツリーが clean であること（汚れていれば prompt がブロックされる）
 - 現在のブランチを stderr に表示する
 
-このため、本コマンドが起動した時点で「現在のブランチが clean なベースライン」であることが保証されている。これを `BASE_BRANCH` として保持する。
+ワーキングツリーが汚れていても問題ない。Trinity は隔離 worktree の中だけで作業し、ホスト側の作業ツリーには触れないためである。ベースは現在ブランチではなく、常に最新の `origin/main` を使う。
+
+`/trinity` 起動直後にリモートを fetch して base ref を確定する。`BASE_BRANCH` は PR の base 指定に、`BASE_REF` は worktree の出発点として使い分ける。
 
 ```shell
-BASE_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git fetch origin main --quiet
+BASE_BRANCH=main
+BASE_REF=origin/main
 ```
+
+`origin/main` が取得できない（リモートが無い・main が無い等）場合は、その旨を明示してユーザーに停止報告する。
 
 ## run ディレクトリと worktree の作成
 
@@ -55,8 +60,8 @@ RUN_DIR="$(pwd)/.trinity/${TS}-${SLUG}"
 WORKTREE_DIR="${RUN_DIR}/worktree"
 BRANCH="trinity/${TS}-${SLUG}"
 mkdir -p "$RUN_DIR"
-git worktree add -b "$BRANCH" "$WORKTREE_DIR" "$BASE_BRANCH"
-printf '=== %s run started on %s (base=%s) ===\n' "${TS}-${SLUG}" "${BRANCH}" "${BASE_BRANCH}" >> .trinity/trinity.log
+git worktree add -b "$BRANCH" "$WORKTREE_DIR" "$BASE_REF"
+printf '=== %s run started on %s (base=%s) ===\n' "${TS}-${SLUG}" "${BRANCH}" "${BASE_REF}" >> .trinity/trinity.log
 ```
 
 同一タイムスタンプで衝突した場合は `SLUG` の末尾に `-2` `-3` などを付ける。
