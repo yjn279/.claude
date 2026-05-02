@@ -30,18 +30,17 @@ run ディレクトリを切る前に、Claude の `AskUserQuestion` ツール�
 
 ヒアリングの回答とユーザーが投入した要件メモを統合した「確定要件」を作り、これを Planner に渡す。確定要件は記憶ではなくテキストとして保持し、次節で生成する `RUN_DIR` 直下に `${RUN_DIR}/intake.md` として書き出す。Planner はこのファイルを読む。
 
-## プリフライト（hook 担当）
-
-`UserPromptSubmit` hook が `/trinity` を検出したとき次を強制する。あなたはこれを再実装しない。
-
-- カレントが git リポジトリであること
-- 現在のブランチを stderr に表示する
+## プリフライト
 
 ワーキングツリーが汚れていても問題ない。Trinity は隔離 worktree の中だけで作業し、ホスト側の作業ツリーには触れないためである。ベースは現在ブランチではなく、常に最新の `origin/main` を使う。
 
-`/trinity` 起動直後にリモートを fetch して base ref を確定する。`BASE_BRANCH` は PR の base 指定に、`BASE_REF` は worktree の出発点として使い分ける。
+`/trinity` 起動直後に次を行う。
+
+- カレントが git リポジトリであることを確認する。違えば停止してユーザーに報告する。
+- リモートを fetch して base ref を確定する。`BASE_BRANCH` は PR の base 指定に、`BASE_REF` は worktree の出発点として使い分ける。
 
 ```shell
+git rev-parse --git-dir >/dev/null 2>&1 || { echo 'trinity: not inside a git repository.' >&2; exit 1; }
 git fetch origin main --quiet
 BASE_BRANCH=main
 BASE_REF=origin/main
