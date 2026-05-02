@@ -52,26 +52,5 @@
         ]
       }
     ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git status:*)",
-      "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(git show:*)",
-      "Bash(git rev-parse:*)",
-      "Bash(git worktree:*)",
-      "Bash(git -C *:*)",
-      "Bash(mkdir -p:*)",
-      "Bash(ls:*)",
-      "Bash(cat .trinity/*)",
-      "Bash(npx tsc --noEmit:*)",
-      "Bash(npx eslint:*)",
-      "Bash(npx vitest run:*)",
-      "Bash(npx jest:*)",
-      "Bash(pytest:*)",
-      "Bash(ruff check:*)",
-      "Bash(mypy:*)"
-    ]
   }
 }
