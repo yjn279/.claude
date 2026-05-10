@@ -19,23 +19,25 @@ description: git リポジトリの初期化（git init）、新規ブランチ�
 
 ## Git Init
 
-新しいリポジトリを作成するときは、パブリックとして公開し、デフォルトブランチ名を `main` に設定する。`master` は使わない。
+新しいリポジトリを初期化するときは、次の手順で進める。`main` ブランチを起点に、空コミットで履歴を確立してから作業ブランチへ移行する流れを守る。
 
-```shell
-git init -b main
-```
+1. パブリックリポジトリとして公開し、デフォルトブランチ名を `main` に設定する。`master` は使わない。
 
-リポジトリ作成直後は、空コミットを作成してブランチを確立する。
+   ```shell
+   git init -b main
+   ```
 
-```shell
-git commit --allow-empty -m "Initial commit"
-```
+2. リポジトリ作成直後は、空コミットを作成してブランチを確立する。
 
-`main` ブランチで直接作業してはいけない。PR ベースのレビューを通すこと、履歴を機能・修正単位で整理すること、問題発生時に特定コミットへ容易に戻れることを理由に、実際の作業はすべて `main` から切った作業ブランチ上で進める。
+   ```shell
+   git commit --allow-empty -m "Initial commit"
+   ```
 
-```shell
-git switch -c feat/add-search-filter
-```
+3. `main` ブランチで直接作業してはいけない。PR ベースのレビューを通すこと、履歴を機能・修正単位で整理すること、問題発生時に特定コミットへ容易に戻れることを理由に、実際の作業はすべて `main` から切った作業ブランチ上で進める。`<type>/<description>` の形式は次節「Git Branch」で定義する。
+
+   ```shell
+   git switch -c <type>/<description>
+   ```
 
 ## Git Branch
 
