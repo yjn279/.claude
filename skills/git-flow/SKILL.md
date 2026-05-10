@@ -56,7 +56,7 @@ description: git リポジトリの初期化、作業ブランチと worktree �
 良いブランチ名の例: `feat/add-search-filter`、`fix/login-redirect-loop`
 悪いブランチ名の例: `feature1`、`tmp`、`yuji-branch`、`20260509`
 
-worktree は、ベースブランチ（既定では `origin/main`、指定があればそのブランチ）の最新コミットを起点として切り出す。同一ブランチに対する既存の worktree が残っている場合は新規作成せず、それを再利用する。
+worktree は、ベースブランチ（既定では `origin/main`、指定があれば対象のブランチや対象 Pull Request に対応するブランチ）の最新コミットを起点として切り出す。同一ブランチに対する既存の worktree が残っている場合は新規作成せず、それを再利用する。
 
 ```shell
 git fetch origin <base>
@@ -69,7 +69,7 @@ git worktree add -b <type>/<description> <path> origin/<base>
 
 1. 変更はリモートのベースブランチに対して push し、Pull Request を作成する。同一ブランチに対する既存の PR が open であれば、新規 PR を作らず追記 push に留める。
 
-2. PR は独断でマージしない。必ずレビュー依頼を行い、承認を得てからマージする。
+2. PR は独断でマージしない。必ずレビュー依頼を行い、承認を得てからスカッシュマージする。履歴を機能・修正単位で 1 コミットに集約するため、マージ方式は squash で固定する。
 
 3. マージ後は関連するブランチと worktree を削除し、ローカル・リモートともクリーンな状態に戻す。
 
@@ -116,9 +116,3 @@ gh pr create --fill
 gh pr merge --squash --delete-branch
 git worktree remove ../login-redirect
 ```
-
-## 参照
-
-併用するスキルを以下に示す。
-
-- markdown：本スキルのドキュメント記述ルールに準拠する際に参照する。
