@@ -28,6 +28,8 @@
 
 ## 参考
 
+Claude Code の公式ドキュメントを以下に示す。
+
 - Claude Code: Explore the .claude directory — https://code.claude.com/docs/en/claude-directory
 - Claude Code: Create plugins — https://code.claude.com/docs/en/plugins.md
 - Claude Code: Sub agents — https://code.claude.com/docs/en/sub-agents
