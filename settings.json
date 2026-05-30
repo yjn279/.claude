@@ -1,5 +1,19 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "enabledPlugins": {
+    "claude-md-management@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "example-skills@anthropic-agent-skills": true,
+    "trinity@yjn279": true
+  },
   "extraKnownMarketplaces": {
     "yjn279": {
       "source": {
@@ -9,17 +23,8 @@
       }
     }
   },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "f=\"$(jq -r '.tool_input.file_path // empty' 2>/dev/null)\"; case \"$f\" in */agents/*.md|*/commands/*.md) head -1 \"$f\" 2>/dev/null | grep -q '^---$' || echo 'WARN: agent/command file missing YAML frontmatter delimiter ---' >&2 ;; esac"
-          }
-        ]
-      }
-    ]
-  }
+  "effortLevel": "xhigh",
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true
 }

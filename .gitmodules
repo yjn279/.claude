@@ -1,16 +1,4 @@
-[submodule "trinity"]
-	path = plugins/trinity
-	url = https://github.com/yjn279/trinity.git
-	branch = main
 [submodule "skills/humanizer"]
 	path = skills/humanizer
 	url = https://github.com/blader/humanizer.git
-	branch = main
-[submodule "plugins/claude-plugins-official"]
-	path = plugins/claude-plugins-official
-	url = https://github.com/anthropics/claude-plugins-official
-	branch = main
-[submodule "plugins/knowledge-work-plugins"]
-	path = plugins/knowledge-work-plugins
-	url = https://github.com/anthropics/knowledge-work-plugins
 	branch = main

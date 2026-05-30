@@ -1,0 +1,11 @@
+# ~/.claude is Claude Code's live directory and holds a lot of machine-generated
+# runtime data (projects, sessions, security, telemetry, plugins cache, ...).
+# Ignore everything by default, then allow only the version-controlled config.
+/*
+
+!/.github/
+!/.gitignore
+!/.gitmodules
+!/README.md
+!/settings.json
+!/skills/
