@@ -6,6 +6,7 @@
 !/.github/
 !/.gitignore
 !/.gitmodules
+!/CLAUDE.md
 !/README.md
 !/settings.json
 !/skills/
