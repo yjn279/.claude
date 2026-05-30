@@ -19,16 +19,18 @@ Markdownファイルは、文章による完全な説明、見出し・リスト
 
 ## Notation
 
+### Front Matter
+
+Front Matter のメタデータキー（ `name:` , `description:` 等）は英語で記載する。値は用途に応じた言語とし、 `description:` はオートロードのマッチングに使われるため日本語を許容する。
+
 ### Headings
 
 見出しは文章の論理構造を可視化するために使用する。読み手が目次として一覧したときに、文書全体の骨格が把握できる粒度で設計する。
 
-- H1 および H2 見出しは基本的に英語で記載する（例: Getting Started / References）。
+- H1 および H2 見出しは基本的に英語で記載する（例: Introduction / Overview）。
 - 見出しは文章ではなく、簡潔な1〜3語の組み合わせにする（例: Getting Started / References / How to Work）。
 - 通し番号や絵文字は付与しない。番号や装飾は構造そのものを曖昧にする。
 - 階層は内容の論理構造に従って自然に決める。装飾目的で深くしない。
-
-Front Matter のメタデータキー（ `name:` , `description:` 等）は英語で記載する。値は用途に応じた言語とする（ `description:` はオートロードのマッチングに使われるため日本語を許容）。
 
 ### Lists
 
