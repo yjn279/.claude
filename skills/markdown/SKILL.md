@@ -1,6 +1,6 @@
 ---
 name: markdown
-description: Markdownファイルを書く・編集する際に必ず使用するスキル。READMEやドキュメント、技術仕様書、Issueテンプレート、ノート、議事録など、`.md` 形式のファイルを新規作成または更新する全てのケースで適用する。見出し・リスト・テキスト・テーブル・Mermaid図の体系的な構造化ルールを定め、読みやすく一貫性のあるドキュメントを生成する。「ドキュメントを書いて」「READMEを更新して」「議事録をまとめて」「Markdownで書いて」などの依頼があった際は、明示的に指示されなくても本スキルを参照する。
+description: Skill that must be used whenever writing or editing Markdown files. Apply it in every case of creating or updating `.md` files, including READMEs, documentation, technical specifications, Issue templates, notes, and meeting minutes. It defines systematic structuring rules for headings, lists, text, tables, and Mermaid diagrams to produce readable and consistent documents. Always refer to this skill for requests such as writing documentation, updating a README, summarizing meeting minutes, or writing in Markdown, even when not explicitly instructed.
 ---
 
 # Markdown
