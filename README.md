@@ -7,26 +7,22 @@
 ```shell
 .
 ├── plugins/
-│   ├── trinity/                    # git submodule → https://github.com/yjn279/trinity
-│   │                               #   Trinity プラグイン（Planner → Generator → Evaluator）
-│   ├── code-review/                # subtree → anthropics/claude-plugins-official plugins/code-review
-│   ├── code-simplifier/            # subtree → anthropics/claude-plugins-official plugins/code-simplifier
-│   ├── claude-md-management/       # subtree → anthropics/claude-plugins-official plugins/claude-md-management
-│   ├── feature-dev/                # subtree → anthropics/claude-plugins-official plugins/feature-dev
-│   ├── frontend-design/            # subtree → anthropics/claude-plugins-official plugins/frontend-design
-│   ├── plugin-dev/                 # subtree → anthropics/claude-plugins-official plugins/plugin-dev
-│   ├── pr-review-toolkit/          # subtree → anthropics/claude-plugins-official plugins/pr-review-toolkit
-│   └── ralph-loop/                 # subtree → anthropics/claude-plugins-official plugins/ralph-loop
+│   ├── claude-plugins-official/    # git submodule → anthropics/claude-plugins-official
+│   └── knowledge-work-plugins/     # git submodule → anthropics/knowledge-work-plugins
 ├── skills/
-│   ├── humanizer/                  # git submodule → https://github.com/blader/humanizer
-│   └── documentation/SKILL.md
-├── settings.json               # 個人用フックと汎用 dev ツールの permissions
+│   ├── trinity/                    # subtree → https://github.com/yjn279/trinity（git 履歴ごと取り込み）
+│   │                               #   Trinity ハーネス（Planner → Generator → Evaluator）
+│   ├── git-flow/                   # git 運用（ブランチ・worktree・PR・クリーンアップ）
+│   ├── markdown/                   # Markdown 執筆ルール
+│   └── humanizer/                  # git submodule → https://github.com/blader/humanizer
+├── settings.json                   # 個人用フックと dev ツールの permissions
+├── .gitmodules
 └── README.md
 ```
 
 ## ランタイム artifacts
 
-`/trinity:run` は **実行プロジェクトのルート** に `.trinity/<run>/` を作って worktree とログを置く。`~/.claude/` 配下にはランタイム成果物を一切作らない。
+`trinity` スキルは **実行プロジェクトのルート** に `.trinity/<run>/` を作って worktree とログを置く。`~/.claude/` 配下にはランタイム成果物を一切作らない。
 
 ## 参考
 
