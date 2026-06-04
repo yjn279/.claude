@@ -6,6 +6,10 @@
 
 ```shell
 .
+├── bin/
+│   └── discord-channel.sh          # Discord チャネルリスナーの起動スクリプト
+├── docs/
+│   └── discord-channel.md          # Discord チャネル Bot のセットアップ手順
 ├── plugins/
 │   ├── trinity/                    # git submodule → https://github.com/yjn279/trinity
 │   │                               #   Trinity プラグイン（Planner → Generator → Evaluator）
@@ -27,6 +31,10 @@
 ## ランタイム artifacts
 
 `/trinity:run` は **実行プロジェクトのルート** に `.trinity/<run>/` を作って worktree とログを置く。`~/.claude/` 配下にはランタイム成果物を一切作らない。
+
+## Discord channel
+
+公式プラグイン `discord@claude-plugins-official` で Discord と Claude Code セッションを橋渡しする。起動は `bin/discord-channel.sh`、初期設定とアクセス制御の手順は [docs/discord-channel.md](docs/discord-channel.md) にまとめてある。トークンとアクセス設定（`channels/discord/`）はランタイムデータとして gitignore 済みで、リポジトリには含めない。
 
 ## 参考
 
