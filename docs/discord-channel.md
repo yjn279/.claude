@@ -67,6 +67,16 @@ Claude Code でプラグインを導入し、トークンを保存する。設�
 
 ユーザー ID は Discord の Developer Mode を有効にして `Copy User ID` で取得できる。ペアリングを使わずこの ID 直接指定で許可リストを作る方が確実である。
 
+### All Channels
+
+チャンネル応答は `groups[channelId]` に登録されたチャンネルでのみ有効で、全チャンネルを一括で表すワイルドカードは標準にはない。全チャンネルで反応させたい場合は、サーバーの全テキストチャンネルを `groups` に登録する。新規チャンネルを作成したときは都度追加が必要になる。チャンネル一覧は次のように取得し、`type` が `0` / `5` / `15`（テキスト / アナウンス / フォーラム）の ID を `groups` に追加して、それぞれ `requireMention` と `allowFrom` を設定する。
+
+```shell
+TOKEN=$(grep '^DISCORD_BOT_TOKEN=' ~/.claude/channels/discord/.env | cut -d= -f2-)
+curl -s -A "DiscordBot" -H "Authorization: Bot $TOKEN" \
+  "https://discord.com/api/v10/guilds/<GUILD_ID>/channels"
+```
+
 ## Access File
 
 設定の実体は `~/.claude/channels/discord/access.json` にある。DM は本人のみ許可し、jarvis 系チャンネルでは @メンションまたは「jarvis」表記で反応する構成の例を示す。
