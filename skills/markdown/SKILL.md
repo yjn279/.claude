@@ -1,11 +1,11 @@
 ---
 name: markdown
-description: Skill that must be used whenever writing or editing Markdown files. Apply it in every case of creating or updating `.md` files, including READMEs, documentation, technical specifications, Issue templates, notes, and meeting minutes. It defines systematic structuring rules for headings, lists, text, tables, and Mermaid diagrams to produce readable and consistent documents. Always refer to this skill for requests such as writing documentation, updating a README, summarizing meeting minutes, or writing in Markdown, even when not explicitly instructed.
+description: Skill for writing or editing Markdown and Markdown-like text on services like Notion, Zenn, or note.
 ---
 
 # Markdown
 
-Markdownファイルは、文章による完全な説明、見出し・リスト・テーブルによる体系的な整理、必要に応じたMermaid図による視覚的補助で構成する。読み手が論理構造を辿れるよう、情報の羅列ではなく論理ピラミッドの構築を意識する。
+Markdown、および Notion・Zenn・note など Markdown-like な記法で記述するサービス上の文章は、文章による完全な説明、見出し・リスト・テーブルによる体系的な整理、必要に応じたMermaid図による視覚的補助で構成する。読み手が論理構造を辿れるよう、情報の羅列ではなく論理ピラミッドの構築を意識する。
 
 ## Principles
 
