@@ -1,146 +1,79 @@
 ---
 name: git-flow
-description: git リポジトリの初期化、作業ブランチと worktree の切り出し、Pull Request による統合、ブランチ・worktree の後片付けまでを通したライフサイクル全体に関わるタスクで呼び出すスキル。「リポジトリを作りたい」「ブランチを切って worktree で作業したい」「PR を作ってマージしたい」「作業後のクリーンアップを忘れないようにしたい」という状況で必ず参照すること。
+description: Skill for the full git lifecycle in this repo, from init through branch, worktree, PR, and cleanup.
 ---
 
 # Git Flow
 
-このリポジトリにおける git 運用の基本方針を定める。対象は、新規リポジトリの立ち上げ、作業ブランチと worktree の切り出し、Pull Request 経由での統合と後片付けの 3 フェーズである。
+このリポジトリにおける git 運用の方針を定める。`main` ブランチでは直接作業せず、すべての変更を作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
-## いつ使うか
+ライフサイクルは Initialization・Start・Integration・Cleanup の4フェーズからなる。全体像を以下に示す。
 
-次のいずれかに当てはまる状況でこのスキルを参照する。
-
-- 新しいリポジトリを作成・初期化しようとしている
-- 新しい作業に取りかかろうとしている、またはブランチ名の形式に迷っている
-- ベースブランチの最新から worktree を切り出して並行作業したい
-- `main` ブランチで直接作業しようとしている
-- 変更を Pull Request としてリモートに統合したい
-- 作業完了後にブランチや worktree を整理したい
+```mermaid
+flowchart LR
+  init[Initialization] --> start[Start]
+  start --> integrate[Integration]
+  integrate --> cleanup[Cleanup]
+  cleanup --> start
+```
 
 ## Initialization
 
-新規リポジトリを初期化するフェーズである。`main` ブランチを起点に、空コミットで履歴を確立してから作業ブランチへ移行する流れを守る。
-
-1. パブリックリポジトリとして公開し、デフォルトブランチ名を `main` に設定する。`master` は使わない。
-
-   ```shell
-   git init -b main
-   ```
-
-2. リポジトリ作成直後は、空コミットを作成してブランチを確立する。
-
-   ```shell
-   git commit --allow-empty -m "Initial commit"
-   ```
-
-3. `main` ブランチで直接作業してはいけない。PR ベースのレビューを通すこと、履歴を機能・修正単位で整理すること、問題発生時に特定コミットへ容易に戻れることを理由に、実際の作業はすべて `main` から切った作業ブランチ上で進める。ブランチ命名と worktree 作成は次節「Start」で扱う。
-
-## Start
-
-新しい作業を開始するフェーズである。命名規則に従ってブランチを定義し、ベースブランチの最新コミットから worktree を切り出す。worktree を分離することで、ブランチを切り替えずに並行作業や緊急対応に取りかかれる。
-
-ブランチ名は `<type>/<description>` の形式とする。`<type>` はそのブランチで行う変更の種類、`<description>` は変更内容を表す。
-
-`<type>` の代表例を以下に示す。
-
-- `feat`: 新機能の追加
-- `fix`: バグ修正
-- `chore`: ビルドやツールなど、コードに直接関係しない変更
-- `docs`: ドキュメントの変更
-- `refactor`: 動作を変えないコードの整理・改善
-- `test`: テストの追加や修正
-
-`<description>` は kebab-case の英語短句とし、2〜5 語に収める。変更内容が一言で伝わる具体的な動詞句を選ぶ。人名・連番・日付スタンプ・`tmp`・`wip` のような意味を持たない語は避ける。
-
-スラッグは次のいずれかを起点に生成する。
-
-- Issue 番号がある場合: その Issue のタイトルや本文から変更内容を抽出してスラッグ化する。
-- 要件文のみの場合: 要件を要約した動詞句を kebab-case に変換してスラッグとする。
-- 継続対象の PR タイトルがある場合: PR タイトルをそのまま使わず、kebab-case・語数・避ける語の上記規約に合わせて整形する。
-
-リポジトリパス（作業中のリポジトリ）とベースブランチ（既定 `origin/main`）は worktree 作成時に明示入力として要求せず、文脈から推測する。
-
-良いブランチ名の例: `feat/add-search-filter`、`fix/login-redirect-loop`
-悪いブランチ名の例: `feature1`、`tmp`、`yuji-branch`、`20260509`
-
-worktree は、ベースブランチ（既定では `origin/main`、指定があれば対象のブランチや対象 Pull Request に対応するブランチ）の最新コミットを起点として切り出す。同一ブランチに対する既存の worktree が残っている場合は新規作成せず、それを再利用する。
-
-worktree の配置と命名には以下の規約に従う。配置先をリポジトリ配下に統一することで、どのリポジトリでも worktree の場所が一貫し、ローカル専用ファイルのコピー先も固定しやすくなる。
-
-- 配置先: リポジトリ外ではなく、対象リポジトリ配下の `./.worktrees/` ディレクトリに置く。
-- 命名: ブランチ名の `/` を `-` に変換した文字列をディレクトリ名とする（例: ブランチ `feat/triple-s-mastra-migration` → `.worktrees/feat-triple-s-mastra-migration`）。
-
-新規 worktree を作成するときの標準動作は次のとおりである。
-
-1. 同名の worktree が既に存在する場合は新規作成せず、それを再利用する。作業ツリーが壊れているなど再利用できない事情がある場合に限り、削除してから再作成する。
-2. ベースブランチの最新を取得し、`./.worktrees/<変換後のブランチ名>` に worktree を作成する。
-3. Git 管理外のローカル専用設定ファイル（例: `.env`、サービスアカウント JSON）が必要な場合は、ベースの作業ディレクトリから対応する相対パスでコピーする（例: `cp .env .worktrees/feat-my-feature/.env`）。
-4. コピー後、作業ディレクトリに移動して即座に開発を始められる状態に整える。
-
-```shell
-git fetch origin <base>
-git worktree add -b <type>/<description> ./.worktrees/<dir> origin/<base>
-```
-
-## Cleanup
-
-作業を完了させ、リモートに統合してから環境を整えるフェーズである。レビューを経ずに勝手にマージしないこと、マージ後の残骸を放置しないことを徹底する。
-
-1. 変更はリモートのベースブランチに対して push し、Pull Request を作成する。同一ブランチに対する既存の PR が open であれば、新規 PR を作らず追記 push に留める。
-
-2. PR は独断でマージしない。必ずレビュー依頼を行い、承認を得てからスカッシュマージする。履歴を機能・修正単位で 1 コミットに集約するため、マージ方式は squash で固定する。
-
-3. マージ後は関連するブランチと worktree を削除し、ローカル・リモートともクリーンな状態に戻す。
-
-   ```shell
-   git worktree remove <path>
-   git branch -d <type>/<description>
-   git push origin --delete <type>/<description>
-   ```
-
-4. マージ後は、その作業に関連する GitHub Issue を完了としてクローズする。
-
-   ```shell
-   gh issue close <番号> --reason completed
-   ```
-
-## 例
-
-次の例は、このスキルが対象とする典型的なフェーズ移行を示す。
-
-### 例 1: 新規リポジトリの初期化
-
-新しいプロジェクトを始めるために空のディレクトリでリポジトリを初期化し、最初の作業ブランチへ移行する。
+新規リポジトリを立ち上げるフェーズである。デフォルトブランチを `main` としたパブリックリポジトリを作成し、空コミットで履歴の起点を確立する。`master` は使わない。
 
 ```shell
 git init -b main
 git commit --allow-empty -m "Initial commit"
-git switch -c feat/initial-setup
 ```
 
-これにより `main` には空コミットだけが残り、実作業はすべて `feat/initial-setup` ブランチ上で行われる。
+## Start
 
-### 例 2: 既存リポジトリで worktree を切り出して作業を開始する
+作業を開始するフェーズである。命名規則に従ったブランチを、ベースブランチの最新コミットから worktree として切り出す。worktree を独立させることで、ブランチを切り替えずに並行作業や緊急対応へ移れる。
 
-`main` の最新を取得し、`fix/login-redirect-loop` ブランチを `origin/main` から派生させてリポジトリ配下の `./.worktrees/fix-login-redirect-loop` に worktree を作成する。その後、ローカル専用設定ファイルを必要に応じてコピーし、すぐに作業を始められる状態に整える。
+ブランチ名は `<type>/<description>` 形式とする。`<type>` は変更の種類を表し、以下から選ぶ。
+
+| type | 用途 |
+| :-- | :-- |
+| feat | 新機能の追加 |
+| fix | バグ修正 |
+| chore | コードに直接関係しない変更（ビルド・ツールなど） |
+| docs | ドキュメントの変更 |
+| refactor | 挙動を変えないコードの整理 |
+| test | テストの追加・修正 |
+
+`<description>` は変更内容が一言で伝わる kebab-case の英語動詞句とし、2〜5 語に収める。人名・連番・日付・ `tmp` ・ `wip` のような意味を持たない語は避ける。
+
+| 評価 | 例 |
+| :-- | :-- |
+| 良い | `feat/add-search-filter` , `fix/login-redirect-loop` |
+| 悪い | `feature1` , `tmp` , `yuji-branch` , `20260509` |
+
+worktree はベースブランチ（既定 `origin/main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
 
 ```shell
-git fetch origin main
-git worktree add -b fix/login-redirect-loop ./.worktrees/fix-login-redirect-loop origin/main
-# ローカル専用設定ファイルが必要な場合はコピーする（例: cp .env .worktrees/fix-login-redirect-loop/.env）
-cd ./.worktrees/fix-login-redirect-loop
+git fetch origin <base>
+git worktree add -b <type>/<description> .worktrees/<dir> origin/<base>
 ```
 
-### 例 3: PR を作成し、マージ後にクリーンアップする
+## Integration
 
-変更を push して PR を作成し、レビュー承認後にマージしてからブランチと worktree を削除し、関連 Issue をクローズする。
+変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビュー承認を経てからマージする。
+
+PR は独断でマージしない。必ずレビューを依頼し、承認を得てからマージする。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
 
 ```shell
-git push -u origin fix/login-redirect-loop
+git push -u origin <type>/<description>
 gh pr create --fill
-# レビュー承認後
-gh pr merge --squash --delete-branch
-git worktree remove ./.worktrees/fix-login-redirect-loop
-gh issue close <番号> --reason completed
+gh pr merge --squash
+```
+
+## Cleanup
+
+マージ後に環境を整えるフェーズである。残骸を残さないよう、ブランチと worktree を削除し、関連する GitHub Issue をクローズする。
+
+```shell
+git worktree remove .worktrees/<dir>
+git branch -d <type>/<description>
+git push origin --delete <type>/<description>
+gh issue close <number> --reason completed
 ```
