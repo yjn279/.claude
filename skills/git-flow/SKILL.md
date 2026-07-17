@@ -67,7 +67,7 @@ gh pr create --fill
 gh pr merge --squash
 ```
 
-マージ後は本体ディレクトリへ戻り、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+マージ後は本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
 
 ```shell
 git pull --ff-only origin <base>
