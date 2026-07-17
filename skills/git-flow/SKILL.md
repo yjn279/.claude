@@ -7,7 +7,7 @@ description: Skill for the full git lifecycle in this repo, from init through br
 
 このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、最初にクローンした場所）は、常にベースブランチ（既定 `main` ）をチェックアウトした状態に保ち、そこで直接作業はしない。変更はすべて、本体ディレクトリから切り出した作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
-ライフサイクルは Initialization・Start・Integration・Cleanup の4フェーズからなる。全体像を以下に示す。
+ライフサイクルは Initialization・Start・Integration・Cleanup の 4 フェーズからなる。全体像を以下に示す。
 
 ```mermaid
 flowchart LR
