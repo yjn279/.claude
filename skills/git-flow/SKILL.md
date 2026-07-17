@@ -5,7 +5,7 @@ description: Skill for the full git lifecycle in this repo, from init through br
 
 # Git Flow
 
-このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、最初にクローンした場所）は、常にベースブランチ（既定 `main` ）をチェックアウトした状態に保ち、そこで直接作業はしない。変更はすべて、本体ディレクトリから切り出した作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
+このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、最初にクローンした場所）は、常にベースブランチ（既定 `main` ）をチェックアウトした状態に保ち、そこで直接作業はしない。変更はすべて作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
 ライフサイクルは Initialization・Start・Integration・Cleanup の 4 フェーズからなる。全体像を以下に示す。
 
@@ -48,7 +48,7 @@ git commit --allow-empty -m "Initial commit"
 | 良い | `feat/add-search-filter` , `fix/login-redirect-loop` |
 | 悪い | `feature1` , `tmp` , `yuji-branch` , `20260509` |
 
-worktree はベースブランチ（既定 `origin/main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
+worktree はベースブランチ（既定 `main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
 
 ```shell
 git fetch origin <base>
@@ -65,17 +65,12 @@ gh pr create --fill
 gh pr merge --squash
 ```
 
-マージ後は本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+## Cleanup
+
+マージ後に環境を整えるフェーズである。本体ディレクトリへ戻り、自分以外の変更も含めて origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、利用者の判断に委ねる。残骸を残さないよう、ブランチと worktree を削除し、関連する GitHub Issue をクローズする。
 
 ```shell
 git pull --ff-only origin <base>
-```
-
-## Cleanup
-
-マージ後に環境を整えるフェーズである。残骸を残さないよう、ブランチと worktree を削除し、関連する GitHub Issue をクローズする。
-
-```shell
 git worktree remove .worktrees/<dir>
 git branch -d <type>/<description>
 git push origin --delete <type>/<description>
