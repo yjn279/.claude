@@ -5,7 +5,7 @@ description: Skill for the full git lifecycle in this repo, from init through br
 
 # Git Flow
 
-このリポジトリにおける git 運用の方針を定める。`main` ブランチでは直接作業せず、すべての変更を作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
+このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、最初にクローンした場所）は、常にベースブランチ（既定 `main` ）をチェックアウトした状態に保ち、そこで直接作業はしない。変更はすべて、本体ディレクトリから切り出した作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
 ライフサイクルは Initialization・Start・Integration・Cleanup の4フェーズからなる。全体像を以下に示す。
 
@@ -67,7 +67,7 @@ gh pr create --fill
 gh pr merge --squash
 ```
 
-マージ後は、作業ブランチの worktree とは別の場所でチェックアウトしているベースブランチ（既定 `main` ）に、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+マージ後は、ベースブランチ（既定 `main` ）をチェックアウトしている本体ディレクトリへ戻り、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。版数の更新を伴うリリース用の PR をマージした場合も、同じ手順で手元の状態をリリース後の姿に揃える。
 
 ```shell
 git pull --ff-only origin <base>
