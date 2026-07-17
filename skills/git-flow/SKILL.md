@@ -57,9 +57,7 @@ git worktree add -b <type>/<description> .worktrees/<dir> origin/<base>
 
 ## Integration
 
-変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビュー承認を経てからマージする。
-
-PR は独断でマージしない。必ずレビューを依頼し、承認を得てからマージする。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
+変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビューの承認を得てからマージする。独断でのマージは行わない。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
 
 ```shell
 git push -u origin <type>/<description>
