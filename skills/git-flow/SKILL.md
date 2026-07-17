@@ -61,15 +61,16 @@ git worktree add -b <type>/<description> .worktrees/<dir> origin/<base>
 
 PR は独断でマージしない。必ずレビューを依頼し、承認を得てからマージする。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
 
-マージ後は、手元のベースブランチ（既定 `main`）を origin の最新へ早送り（fast-forward）で合わせる。早送りできない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。版数の更新を伴うリリース用の PR をマージした場合も同じ手順で、手元の状態をリリース後の姿に揃える。
-
 ```shell
 git push -u origin <type>/<description>
 gh pr create --fill
 gh pr merge --squash
-git fetch origin <base>
-git switch <base>
-git merge --ff-only origin/<base>
+```
+
+マージ後は、作業ブランチの worktree とは別の場所でチェックアウトしているベースブランチ（既定 `main` ）に、origin の最新を fast-forward で取り込む。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+
+```shell
+git pull --ff-only origin <base>
 ```
 
 ## Cleanup
