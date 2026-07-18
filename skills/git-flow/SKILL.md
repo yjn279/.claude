@@ -5,7 +5,7 @@ description: Skill for the full git lifecycle in this repo, from init through br
 
 # Git Flow
 
-このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、最初にクローンした場所）は、常にベースブランチ（既定 `main` ）をチェックアウトした状態に保ち、そこで直接作業はしない。変更はすべて作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
+このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、常にベースブランチの最新をチェックアウトしておく場所）では直接作業はしない。変更はすべて作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
 ライフサイクルは Initialization・Start・Integration・Cleanup の 4 フェーズからなる。全体像を以下に示す。
 
@@ -57,7 +57,7 @@ git worktree add -b <type>/<description> .worktrees/<dir> origin/<base>
 
 ## Integration
 
-変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビューの承認を得てからマージする。独断でのマージは行わない。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
+変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビューの承認を得てからマージする。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
 
 ```shell
 git push -u origin <type>/<description>
@@ -65,10 +65,10 @@ gh pr create --fill
 gh pr merge --squash
 ```
 
-リモートでのマージだけでは統合は完了しない。worktree から本体ディレクトリ（常にベースブランチをチェックアウトしている場所）へ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃えて初めて、統合は完了する。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+統合を完了するには、worktree から本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃える。fast-forward できない場合は失敗させ、対応を利用者に委ねる。
 
 ```shell
-cd ../..
+cd "$(git rev-parse --path-format=absolute --git-common-dir)/.."
 git pull --ff-only origin <base>
 ```
 
