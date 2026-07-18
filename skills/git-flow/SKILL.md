@@ -59,12 +59,16 @@ git worktree add -b <type>/<description> .worktrees/<dir> origin/<base>
 
 変更を Pull Request としてリモートへ統合するフェーズである。作業ブランチを push して PR を作成し、レビューの承認を得てからマージする。独断でのマージは行わない。履歴を機能・修正単位の 1 コミットへ集約するため、マージ方式は squash に固定する。同一ブランチの PR が既に open であれば、新規に作らず追記 push に留める。
 
-リモートでのマージだけでは統合は完了しない。本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃えて初めて、統合は完了する。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
-
 ```shell
 git push -u origin <type>/<description>
 gh pr create --fill
 gh pr merge --squash
+```
+
+リモートでのマージだけでは統合は完了しない。worktree から本体ディレクトリ（常にベースブランチをチェックアウトしている場所）へ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃えて初めて、統合は完了する。fast-forward できない場合はその場で失敗させ、履歴を黙って分岐させたりマージコミットを作ったりせず、利用者の判断に委ねる。
+
+```shell
+cd ../..
 git pull --ff-only origin <base>
 ```
 
