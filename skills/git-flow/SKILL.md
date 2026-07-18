@@ -65,7 +65,7 @@ gh pr create --fill
 gh pr merge --squash
 ```
 
-統合を完了するには、worktree から本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃える。fast-forward できない場合は失敗させ、対応を利用者に委ねる。
+統合を完了するには、worktree から本体ディレクトリへ戻り、release-please のような版数更新のみの PR を含め、origin の最新を fast-forward で取り込んで手元のベースブランチをマージ後の姿に揃える。fast-forward できない場合は、マージコミットを作ったり履歴を分岐させたりせず失敗させ、対応を利用者に委ねる。
 
 ```shell
 cd "$(git rev-parse --path-format=absolute --git-common-dir)/.."
