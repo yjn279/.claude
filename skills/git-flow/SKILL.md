@@ -48,7 +48,7 @@ git commit --allow-empty -m "Initial commit"
 | 良い | `feat/add-search-filter` , `fix/login-redirect-loop` |
 | 悪い | `feature1` , `tmp` , `yuji-branch` , `20260509` |
 
-worktree はベースブランチ（既定 `main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
+worktree はベースブランチ（既定 `origin/main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
 
 ```shell
 git fetch origin <base>
