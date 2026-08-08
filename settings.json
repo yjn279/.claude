@@ -23,6 +23,30 @@
       }
     }
   },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
   "effortLevel": "xhigh",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
