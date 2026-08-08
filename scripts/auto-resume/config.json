@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "maxResumesPerSession": 3,
+  "maxLimitAgeHours": 12,
+  "resetBufferMinutes": 3,
+  "fallbackWaitMinutes": 60,
+  "transcriptTailBytes": 262144,
+  "resumePrompt": "上限で中断した作業の続きを進めよ。"
+}
