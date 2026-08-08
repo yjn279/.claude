@@ -17,6 +17,9 @@
 │   ├── plugin-dev/                 # subtree → anthropics/claude-plugins-official plugins/plugin-dev
 │   ├── pr-review-toolkit/          # subtree → anthropics/claude-plugins-official plugins/pr-review-toolkit
 │   └── ralph-loop/                 # subtree → anthropics/claude-plugins-official plugins/ralph-loop
+├── scripts/
+│   └── auto-resume/                # 使用量の上限で止まった会話を、解除の時刻に自動で再開する仕組み
+│                                   #   → scripts/auto-resume/README.md
 ├── skills/
 │   ├── humanizer/                  # git submodule → https://github.com/blader/humanizer
 │   ├── frontend-slides/            # git submodule → https://github.com/zarazhangrui/frontend-slides
@@ -31,6 +34,8 @@
 ## ランタイム artifacts
 
 `/trinity:run` は **実行プロジェクトのルート** に `.trinity/<run>/` を作って worktree とログを置く。`~/.claude/` 配下にはランタイム成果物を一切作らない。
+
+`scripts/auto-resume/` の記録だけは `~/.claude/resume-logs/` と `~/.claude/auto-resume/` に置く。いずれも git の管理外である。
 
 ## 参考
 
