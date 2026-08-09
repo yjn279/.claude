@@ -3,9 +3,6 @@
 # 走り終えたら、どう終えても自分の予約を消す使い捨てである。
 set -uo pipefail
 
-# 予約の時刻からこれを超えて遅れて呼ばれたら、再開せず片付ける。
-LATE_LIMIT_SECONDS=$((60 * 60))
-
 SESSION_ID="$1"
 WORKDIR="$2"
 CLAUDE_BIN="$3"
@@ -18,8 +15,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# 予約の時刻からこれを超えて遅れて呼ばれたら、再開せず片付ける。
+LATE_LIMIT_SECONDS=$((60 * 60))
 SCHEDULED_AT="$6"
-
 DELAY=$(( $(date '+%s') - SCHEDULED_AT ))
 if [ "$DELAY" -gt "$LATE_LIMIT_SECONDS" ]; then
   echo "=== $(date '+%Y-%m-%d %H:%M:%S') ${SESSION_ID}: 予約時刻から ${DELAY} 秒遅れたため再開せず片付ける"
