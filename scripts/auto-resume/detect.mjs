@@ -149,7 +149,7 @@ function schedule({ sessionId, cwd, at }) {
   const args = [
     "/usr/bin/caffeinate", "-i",
     "/bin/bash", path.join(HERE, "resume.sh"),
-    sessionId, cwd, which("claude"), CONFIG.resumePrompt, label,
+    sessionId, cwd, which("claude"), CONFIG.resumePrompt, label, String(Math.floor(at.getTime() / 1000)),
   ];
   fs.writeFileSync(plistPath, plistXml({ label, args, workdir: cwd, logPath, at }));
 
