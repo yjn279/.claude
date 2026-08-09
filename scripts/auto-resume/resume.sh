@@ -3,14 +3,13 @@
 # 走り終えたら、どう終えても自分の予約を消す使い捨てである。
 set -uo pipefail
 
-readonly LATE_LIMIT_SECONDS=3600
-
 SESSION_ID="$1"
 WORKDIR="$2"
 CLAUDE_BIN="$3"
 PROMPT="$4"
 LABEL="$5"
 SCHEDULED_AT="$6"
+LATE_LIMIT_SECONDS="$7"
 
 cleanup() {
   rm -f "$HOME/Library/LaunchAgents/${LABEL}.plist"
