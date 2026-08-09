@@ -4,6 +4,18 @@
     "defaultMode": "auto"
   },
   "hooks": {
+    "StopFailure": [
+      {
+        "matcher": "rate_limit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PostCompact": [
       {
         "hooks": [
@@ -35,30 +47,6 @@
         "ref": "main"
       }
     }
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
   },
   "effortLevel": "xhigh",
   "inputNeededNotifEnabled": true,
