@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 会話が使用量の上限で止まったかを判定し、解除の時刻に一度だけ起きる予約を登録する。
-// 会話の終了フック（Stop / SessionEnd）から標準入力で呼ばれる。
+// StopFailure フックから標準入力で呼ばれる。
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -32,39 +32,6 @@ function readStdin() {
   }
 }
 
-/** 記録の末尾だけを読み、会話の最後の発言を取り出す。 */
-function lastConversationEntry(transcriptPath) {
-  const size = fs.statSync(transcriptPath).size;
-  const length = Math.min(size, CONFIG.transcriptTailBytes);
-  const buffer = Buffer.alloc(length);
-  const fd = fs.openSync(transcriptPath, "r");
-  try {
-    fs.readSync(fd, buffer, 0, length, size - length);
-  } finally {
-    fs.closeSync(fd);
-  }
-  const lines = buffer.toString("utf8").split("\n");
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i].trim();
-    if (!line.startsWith("{")) continue;
-    let entry;
-    try {
-      entry = JSON.parse(line);
-    } catch {
-      continue; // 先頭の行は途中で切れている場合がある
-    }
-    if (entry.type === "assistant" || entry.type === "user") return entry;
-  }
-  return null;
-}
-
-function messageText(entry) {
-  const content = entry?.message?.content;
-  if (typeof content === "string") return content;
-  if (!Array.isArray(content)) return "";
-  return content.filter((part) => part?.type === "text").map((part) => part.text).join("\n");
-}
-
 /** 指定の地域における、その時刻の世界標準時からのずれ（ミリ秒）。 */
 function zoneOffsetMs(zone, date) {
   const parts = Object.fromEntries(
@@ -94,10 +61,10 @@ function zonedYmd(zone, date) {
   return { y: +parts.year, m: +parts.month, d: +parts.day };
 }
 
-/** 上限の文面から解除の絶対時刻を求める。読み取れないときは一定時間後を仮の時刻とする。 */
+/** 上限の文面から解除の絶対時刻を求める。読み取れないときは null を返す。 */
 function resetEpoch(text, now) {
   const matched = RESET_RE.exec(text);
-  if (!matched) return { epoch: now.getTime() + CONFIG.fallbackWaitMinutes * 60_000, parsed: false };
+  if (!matched) return null;
 
   let hour = +matched[1] % 12;
   if (matched[3].toLowerCase() === "pm") hour += 12;
@@ -117,7 +84,7 @@ function resetEpoch(text, now) {
   const today = zonedYmd(zone, now);
   let epoch = zonedEpoch(zone, today.y, today.m, today.d, hour, minute);
   if (epoch <= now.getTime()) epoch = zonedEpoch(zone, today.y, today.m, today.d + 1, hour, minute);
-  return { epoch, parsed: true };
+  return epoch;
 }
 
 function readState() {
@@ -195,26 +162,18 @@ function schedule({ sessionId, cwd, at }) {
 }
 
 function decide(payload) {
-  const { transcript_path: transcriptPath, session_id: sessionId, cwd } = payload;
-  if (!transcriptPath || !sessionId || !cwd) return `入力が足りない: ${JSON.stringify(payload)}`;
-  if (!fs.existsSync(transcriptPath)) return `記録が無い: ${transcriptPath}`;
-
-  const entry = lastConversationEntry(transcriptPath);
-  if (!entry) return `${sessionId}: 会話の発言が見つからない`;
-  if (entry.type !== "assistant") return `${sessionId}: 最後は上限ではない（通常の終了）`;
-
-  const text = messageText(entry);
-  if (!LIMIT_RE.test(text)) return `${sessionId}: 最後は上限ではない（通常の終了）`;
+  const { session_id: sessionId, cwd, last_assistant_message: text } = payload;
+  if (!sessionId || !cwd || !text) return `入力が足りない: ${JSON.stringify(payload)}`;
+  if (!LIMIT_RE.test(text)) return `${sessionId}: 上限の文面ではない`;
 
   const now = new Date();
-  const ageHours = (now.getTime() - new Date(entry.timestamp).getTime()) / 3_600_000;
-  if (!(ageHours < CONFIG.maxLimitAgeHours)) return `${sessionId}: 上限から ${ageHours.toFixed(1)} 時間経過。対象外`;
+  const epoch = resetEpoch(text, now);
+  if (epoch === null) return `${sessionId}: 解除の時刻が読めない（${text}）`;
 
   const state = readState();
   const count = state[sessionId]?.count ?? 0;
   if (count >= CONFIG.maxResumesPerSession) return `${sessionId}: 再開 ${count} 回に達した。諦める`;
 
-  const { epoch, parsed } = resetEpoch(text, now);
   const at = new Date(epoch + CONFIG.resetBufferMinutes * 60_000);
   at.setSeconds(0, 0);
 
@@ -223,8 +182,7 @@ function decide(payload) {
 
   state[sessionId] = { count: count + 1, scheduledFor: at.toISOString(), cwd };
   writeState(state);
-  return `${sessionId}: ${at.toISOString()} に再開を予約した`
-    + `（文面: ${parsed ? "解読" : `読めず ${CONFIG.fallbackWaitMinutes} 分後`}, 通算 ${count + 1} 回目）`;
+  return `${sessionId}: ${at.toISOString()} に再開を予約した（通算 ${count + 1} 回目）`;
 }
 
 // 有効・無効の切り替え。設定ファイルか環境変数のどちらでも止められる。
