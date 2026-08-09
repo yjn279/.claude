@@ -150,7 +150,6 @@ function schedule({ sessionId, cwd, at }) {
     "/usr/bin/caffeinate", "-i",
     "/bin/bash", path.join(HERE, "resume.sh"),
     sessionId, cwd, which("claude"), CONFIG.resumePrompt, label, String(Math.floor(at.getTime() / 1000)),
-    String(CONFIG.lateLimitMinutes * 60),
   ];
   fs.writeFileSync(plistPath, plistXml({ label, args, workdir: cwd, logPath, at }));
 
