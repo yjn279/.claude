@@ -51,7 +51,6 @@ rm ~/Library/LaunchAgents/com.claude.auto-resume.<セッションID>.plist
 | `enabled` | `true` | 仕組み全体の有効・無効 |
 | `maxResumesPerSession` | `3` | 同じ会話を再開する上限の回数。再開してすぐまた上限に当たる場合の空回りを防ぐ |
 | `resetBufferMinutes` | `3` | 解除時刻に足す余裕 |
-| `lateLimitMinutes` | `60` | 予約の時刻からこの時間を超えて遅れて呼ばれたら、再開せず片付ける |
 | `resumePrompt` | — | 再開したときに最初に渡す指示 |
 
 ## 記録
