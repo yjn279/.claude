@@ -24,19 +24,9 @@
     }
   },
   "hooks": {
-    "Stop": [
+    "StopFailure": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/scripts/auto-resume/detect.mjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
+        "matcher": "rate_limit",
         "hooks": [
           {
             "type": "command",
