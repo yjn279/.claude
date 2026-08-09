@@ -11,13 +11,14 @@ WORKDIR="$2"
 CLAUDE_BIN="$3"
 PROMPT="$4"
 LABEL="$5"
-SCHEDULED_AT="$6"
 
 cleanup() {
   rm -f "$HOME/Library/LaunchAgents/${LABEL}.plist"
   /bin/launchctl bootout "gui/$(id -u)/${LABEL}" >/dev/null 2>&1
 }
 trap cleanup EXIT
+
+SCHEDULED_AT="$6"
 
 DELAY=$(( $(date '+%s') - SCHEDULED_AT ))
 if [ "$DELAY" -gt "$LATE_LIMIT_SECONDS" ]; then
