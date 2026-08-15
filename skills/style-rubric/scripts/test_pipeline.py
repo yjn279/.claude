@@ -1,7 +1,8 @@
-"""60件規模の実例で、振り分け・ラウンド記録・収束判定・最終検証という
-一連の数値の流れが破綻なく通ることを確認する。
-言語モデルが担う段（規則の抽出・生成・判別）は対象外で、
-split.py と binomial.py の出力だけで組み立てられる数値の流れだけを検証する。
+"""60件規模の実例で、分割からテスト評価までの一連の数値の流れが破綻なく通ることを確認する。
+
+言語モデルが担う段（規則の抽出・生成・判別）は対象外で、split.py と epoch.py の
+出力だけで組み立てられる数値の流れだけを検証する。エポック数に上限は設けないため、
+ここでは上限を扱わない。
 
 python3 -m unittest discover -s skills/style-rubric/scripts で実行する。
 """
@@ -9,20 +10,16 @@ from __future__ import annotations
 
 import sys
 import unittest
-from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import binomial  # noqa: E402
+import epoch  # noqa: E402
 import split  # noqa: E402
 from test_split import make_records  # noqa: E402
 
 SEED = 1
-MAX_ROUNDS = 8
-MIN_PAIRS_PER_ROUND = 20
-CONVERGENCE_STREAK = 2
-P_THRESHOLD = 0.05
+DECEPTION_THRESHOLD = 0.6  # 見破られ率がこの値未満なら収束とみなす。
 
 
 def build_corpus(n=60):
@@ -45,42 +42,57 @@ def build_corpus(n=60):
     return make_records(n, topic_of=topic_of, date_of=date_of, length_of=length_of)
 
 
-def round_record(round_no, total, correct):
-    """1ラウンド分の記録を組み立てる。report.md が必要とする項目をすべて含む。"""
-    rate, p_value = binomial.binomial_test(total, correct)
-    insignificant = p_value > P_THRESHOLD
-    return {
-        "round": round_no,
-        "total": total,
-        "correct": correct,
-        "rate": rate,
-        "p_value": p_value,
-        "judgment": "収束の目安を満たす" if insignificant else "収束の目安に届かず",
-    }
+def build_batch(source_ids):
+    """本人の文章の id 一覧から、本人と生成文が半々のバッチを組む。
+
+    生成文は同じ文章から逆抽出した条件入力を使って作るため、本人側と生成文側は
+    id を共有するが、どちらの役でも1つの id は1回しか登場しない。文章の使い回しは
+    起きない。
+    """
+    batch = []
+    for source_id in source_ids:
+        batch.append({"source_id": source_id, "role": "本人"})
+        batch.append({"source_id": source_id, "role": "生成文"})
+    return batch
 
 
-def is_convergence_candidate(round_records):
-    """直近 CONVERGENCE_STREAK ラウンド連続で「50%と有意差なし」なら収束候補とする。"""
-    if len(round_records) < CONVERGENCE_STREAK:
-        return False
-    return all(r["p_value"] > P_THRESHOLD for r in round_records[-CONVERGENCE_STREAK:])
+def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
+    """混同行列の4区分の件数から、判別役の判定一覧を組み立てる。"""
+    verdicts = []
+    verdicts += [{"truth": "本人", "verdict": "本人"}] * genuine_correct
+    verdicts += [{"truth": "本人", "verdict": "生成文"}] * genuine_wrong
+    verdicts += [{"truth": "生成文", "verdict": "生成文"}] * fake_correct
+    verdicts += [{"truth": "生成文", "verdict": "本人"}] * fake_wrong
+    return verdicts
 
 
-def final_check_record(total, correct):
-    """Y_test による最終検証の記録を組み立てる。"""
-    rate, p_value = binomial.binomial_test(total, correct)
-    converged = p_value > P_THRESHOLD
-    return {
-        "total": total,
-        "correct": correct,
-        "rate": rate,
-        "p_value": p_value,
-        "judgment": (
-            "最終検証を通過し収束"
-            if converged
-            else "評価用の集合への合わせ込みの疑いがあり反復へ戻る"
-        ),
-    }
+def balanced_convergent_verdicts(pair_count):
+    """本人・生成文それぞれ pair_count 件からなる、見破られ率がちょうど0.5になる判定一覧を作る。
+
+    分割から数の流れを通しで確かめるための値であり、閾値ちょうどの境界での
+    収束判定そのものは PipelineEpochRecordTest が別途検証する。
+    """
+    half = pair_count // 2
+    rest = pair_count - half
+    return make_verdicts(
+        genuine_correct=half, genuine_wrong=rest, fake_correct=half, fake_wrong=rest
+    )
+
+
+def epoch_record(epoch_no, verdicts):
+    """1エポック分の判定一覧から、report.md が必要とする記録を組み立てる。
+
+    集計そのものは epoch.py に委ね、ここではエポック番号を書き加えるだけである。
+    判定が一方へ倒れていれば epoch.summarize が epoch.EpochError を送出し、
+    収束判定へは進まない。
+    """
+    summary = epoch.summarize(verdicts)
+    return {"epoch": epoch_no, **summary}
+
+
+def is_converged(deception_rate):
+    """見破られ率が閾値未満なら収束とみなす。"""
+    return deception_rate < DECEPTION_THRESHOLD
 
 
 class PipelineSplitTest(unittest.TestCase):
@@ -91,84 +103,109 @@ class PipelineSplitTest(unittest.TestCase):
         all_assigned = [rid for ids in result["assignments"].values() for rid in ids]
         self.assertEqual(len(all_assigned), 60)
         self.assertEqual(len(all_assigned), len(set(all_assigned)))
-        # 分割自体は課題1で確認済みだが、後続のラウンド記録・収束判定が
-        # 実際の分割結果の上に成り立つことを、通しでここでも確かめる。
+        # 層ごとの丸めが積み重なるため厳密な7:2:1にはならないが、全件が
+        # 過不足なくいずれか1つの集合に割り振られることを確かめる。
+        self.assertEqual(sum(result["counts"].values()), 60)
+
+
+class PipelineBatchTest(unittest.TestCase):
+    def test_validation_set_forms_a_24_sample_batch_without_reusing_text(self):
+        # 偏りのない60件は課題1で確認済みのとおり検証データが厳密に12件になる。
+        # ここではその12件から24サンプルのバッチを使い回しなく組めることを確かめる。
+        records = make_records(60)
+        result = split.split_records(records, seed=SEED)
+        validation_ids = result["assignments"]["validation"]
+        self.assertEqual(len(validation_ids), 12)
+
+        batch = build_batch(validation_ids)
+        self.assertEqual(len(batch), 24)
+        self.assertEqual(sum(1 for s in batch if s["role"] == "本人"), 12)
+        self.assertEqual(sum(1 for s in batch if s["role"] == "生成文"), 12)
+
+        for source_id in validation_ids:
+            uses = [s for s in batch if s["source_id"] == source_id]
+            self.assertEqual(len(uses), 2)
+            self.assertEqual({s["role"] for s in uses}, {"本人", "生成文"})
+
+
+class PipelineEpochRecordTest(unittest.TestCase):
+    def test_epoch_record_contains_every_field_report_needs(self):
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=5, fake_wrong=5)
+        record = epoch_record(1, verdicts)
         self.assertEqual(
-            result["counts"],
-            {"Y_train": 24, "Y_ref": 12, "Y_val": 15, "Y_test": 9},
+            set(record),
+            {"epoch", "total", "confusion", "deception_rate", "p_value", "genuine_answer_rate"},
         )
 
-    def test_val_set_can_supply_a_round_of_20_or_more_pairs(self):
+    def test_deception_rate_of_point_five_five_is_convergence(self):
+        # 20件中11件正答で見破られ率0.55。
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=5, fake_wrong=5)
+        record = epoch_record(1, verdicts)
+        self.assertEqual(record["deception_rate"], 0.55)
+        self.assertTrue(is_converged(record["deception_rate"]))
+
+    def test_deception_rate_of_point_six_is_not_yet_convergence(self):
+        # 20件中12件正答で見破られ率0.6。閾値は「未満」で収束のため、ちょうど0.6は収束しない。
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=6, fake_wrong=4)
+        record = epoch_record(1, verdicts)
+        self.assertEqual(record["deception_rate"], 0.6)
+        self.assertFalse(is_converged(record["deception_rate"]))
+
+    def test_deception_rate_of_point_seven_five_is_not_convergence(self):
+        # 20件中15件正答で見破られ率0.75。
+        verdicts = make_verdicts(genuine_correct=8, genuine_wrong=2, fake_correct=7, fake_wrong=3)
+        record = epoch_record(1, verdicts)
+        self.assertEqual(record["deception_rate"], 0.75)
+        self.assertFalse(is_converged(record["deception_rate"]))
+
+    def test_skewed_verdicts_stop_before_the_convergence_check(self):
+        # 判別役が全サンプルに「生成文」と答えた退化ケース。収束判定へ進む前に停止する。
+        verdicts = make_verdicts(genuine_correct=0, genuine_wrong=12, fake_correct=12, fake_wrong=0)
+        with self.assertRaises(epoch.EpochError):
+            epoch_record(1, verdicts)
+
+
+class PipelineTestEvaluationTest(unittest.TestCase):
+    def test_test_set_forms_a_12_sample_evaluation(self):
+        records = make_records(60)
+        result = split.split_records(records, seed=SEED)
+        test_ids = result["assignments"]["test"]
+        self.assertEqual(len(test_ids), 6)
+
+        batch = build_batch(test_ids)
+        self.assertEqual(len(batch), 12)
+
+    def test_deception_rate_at_or_above_threshold_sends_back_to_rubric_generation(self):
+        # テストデータでの見破られ率が閾値以上なら、ルーブリック生成へ戻る判断になる。
+        verdicts = make_verdicts(genuine_correct=4, genuine_wrong=2, fake_correct=4, fake_wrong=2)
+        result = epoch.summarize(verdicts)
+        self.assertGreaterEqual(result["deception_rate"], DECEPTION_THRESHOLD)
+        self.assertFalse(is_converged(result["deception_rate"]))
+
+
+class PipelineFullFlowTest(unittest.TestCase):
+    def test_flow_from_split_to_test_evaluation_runs_without_error(self):
+        # 時期・長さ・話題が連動して偏った60件でも、分割からテスト評価までの
+        # 数値の流れが例外なく通ることを確かめる。具体的な閾値の境界での
+        # 収束判定は PipelineEpochRecordTest が別途検証しているので、ここでは
+        # 見破られ率がちょうど0.5になる判定一覧を使い、流れの一貫性だけを見る。
         records = build_corpus(60)
         result = split.split_records(records, seed=SEED)
-        y_val = result["assignments"]["Y_val"]
-        self.assertGreater(len(y_val), 0)
+        validation_ids = result["assignments"]["validation"]
+        test_ids = result["assignments"]["test"]
 
-        # Y_val の件数（15件）は1ラウンドに必要な20組を下回るが、
-        # 同じ文章を複数回使えば20組以上を組める。
-        # ただし特定の1件だけが使い回されないよう、使用回数の上限を確認する。
-        selections = [y_val[i % len(y_val)] for i in range(MIN_PAIRS_PER_ROUND)]
-        self.assertEqual(len(selections), MIN_PAIRS_PER_ROUND)
-        usage = Counter(selections)
-        max_allowed_reuse = -(-MIN_PAIRS_PER_ROUND // len(y_val))  # 切り上げ除算
-        self.assertLessEqual(max(usage.values()), max_allowed_reuse)
+        validation_batch = build_batch(validation_ids)
+        self.assertEqual(len(validation_batch), len(validation_ids) * 2)
+        epoch_verdicts = balanced_convergent_verdicts(len(validation_ids))
+        record = epoch_record(1, epoch_verdicts)
+        self.assertEqual(set(record) - {"epoch"}, set(epoch.summarize(epoch_verdicts)))
+        self.assertTrue(is_converged(record["deception_rate"]))
 
-
-class PipelineRoundRecordTest(unittest.TestCase):
-    def test_round_record_contains_every_field_report_needs(self):
-        record = round_record(1, total=20, correct=10)
-        self.assertEqual(
-            set(record), {"round", "total", "correct", "rate", "p_value", "judgment"}
-        )
-
-    def test_two_consecutive_insignificant_rounds_are_a_convergence_candidate(self):
-        records = [
-            round_record(1, total=20, correct=10),
-            round_record(2, total=20, correct=11),
-        ]
-        self.assertTrue(all(r["p_value"] > P_THRESHOLD for r in records))
-        self.assertTrue(is_convergence_candidate(records))
-
-    def test_single_insignificant_round_is_not_yet_a_candidate(self):
-        records = [round_record(1, total=20, correct=10)]
-        self.assertFalse(is_convergence_candidate(records))
-
-    def test_a_significant_round_breaks_the_streak(self):
-        records = [
-            round_record(1, total=20, correct=10),
-            round_record(2, total=20, correct=15),  # p<0.05 で有意
-        ]
-        self.assertLess(records[1]["p_value"], P_THRESHOLD)
-        self.assertFalse(is_convergence_candidate(records))
-
-
-class PipelineFinalCheckTest(unittest.TestCase):
-    def test_final_check_with_skewed_result_sends_back_to_iteration(self):
-        records = build_corpus(60)
-        result = split.split_records(records, seed=SEED)
-        y_test_count = result["counts"]["Y_test"]
-
-        # Y_test の全件を見破られた想定（評価用の集合に合わせ込んでいた場合の典型例）。
-        final = final_check_record(total=y_test_count, correct=y_test_count)
-        self.assertLess(final["p_value"], P_THRESHOLD)
-        self.assertIn("反復へ戻る", final["judgment"])
-
-    def test_final_check_with_chance_level_result_confirms_convergence(self):
-        final = final_check_record(total=20, correct=10)
-        self.assertGreater(final["p_value"], P_THRESHOLD)
-        self.assertIn("収束", final["judgment"])
-
-
-class PipelineCutoffTest(unittest.TestCase):
-    def test_eight_rounds_without_convergence_triggers_cutoff(self):
-        records = []
-        for round_no in range(1, MAX_ROUNDS + 1):
-            records.append(round_record(round_no, total=20, correct=15))  # 常に有意
-            self.assertFalse(is_convergence_candidate(records))
-
-        self.assertEqual(len(records), MAX_ROUNDS)
-        cutoff_reached = len(records) >= MAX_ROUNDS and not is_convergence_candidate(records)
-        self.assertTrue(cutoff_reached)
+        test_batch = build_batch(test_ids)
+        self.assertEqual(len(test_batch), len(test_ids) * 2)
+        test_verdicts = balanced_convergent_verdicts(len(test_ids))
+        test_result = epoch.summarize(test_verdicts)
+        self.assertTrue(is_converged(test_result["deception_rate"]))
 
 
 if __name__ == "__main__":
