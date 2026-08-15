@@ -60,7 +60,7 @@ class SplitRecordsTest(unittest.TestCase):
 
         self.assertEqual(
             result["counts"],
-            {"Y_train": 24, "Y_ref": 12, "Y_val": 15, "Y_test": 9},
+            {"train": 42, "validation": 12, "test": 6},
         )
 
     def test_same_seed_is_reproducible(self):
@@ -160,7 +160,7 @@ class SplitCliTest(unittest.TestCase):
         code, out, _err = run_main(["--seed", "1", path])
         self.assertEqual(code, 0)
         payload = json.loads(out)
-        self.assertEqual(payload["counts"]["Y_train"], 24)
+        self.assertEqual(payload["counts"]["train"], 42)
 
     def test_subprocess_exit_code_is_nonzero_for_bad_input(self):
         # main() を直接呼ぶテストだけでなく、実際にプロセスとして起動した場合の
@@ -185,7 +185,7 @@ class SplitCliTest(unittest.TestCase):
         )
         self.assertEqual(proc.returncode, 0)
         payload = json.loads(proc.stdout)
-        self.assertEqual(payload["counts"]["Y_train"], 24)
+        self.assertEqual(payload["counts"]["train"], 42)
 
 
 if __name__ == "__main__":

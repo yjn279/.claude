@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""本人の文章を Y_train / Y_ref / Y_val / Y_test の4集合へ層化して振り分ける。
+"""本人の文章を学習データ・検証データ・テストデータの3集合へ層化して振り分ける。
 
 集合の役割:
-- Y_train（約40%） 規則の抽出と更新に使う
-- Y_ref （約20%） 判別役に見せる、書き手の見本
-- Y_val （約25%） 反復のなかでの評価に使う本人側サンプル
-- Y_test（約15%） 収束後の最終検証専用。反復中は一度も参照しない
+- train（70%）     ルーブリック生成の材料。および判別役（Discriminator）へ渡す見本
+- validation（20%） 条件抽出の材料。および判別バッチの本人側サンプル
+- test（10%）       テスト評価専用。学習ループ中は一度も参照しない
 
 時期・長さ・話題の偏りが各集合へ均等に散るよう、この3項目を組み合わせた層ごとに
 比率どおりの人数を割り当てる。長さは文章の文字数から、時期は日付から、この
@@ -37,8 +36,8 @@ import random
 import sys
 from datetime import date
 
-SET_NAMES = ("Y_train", "Y_ref", "Y_val", "Y_test")
-SET_RATIOS = (0.40, 0.20, 0.25, 0.15)
+SET_NAMES = ("train", "validation", "test")
+SET_RATIOS = (0.7, 0.2, 0.1)
 MIN_RECORDS_FOR_ITERATION = 30
 BUCKET_COUNT = 3  # 時期・長さをそれぞれ何段階に分けるか
 
@@ -109,7 +108,7 @@ def _stratum_keys(records):
 
 
 def _allocate(n):
-    """n 件を SET_RATIOS の比率で4集合へ分ける件数を、最大剰余法で求める。"""
+    """n 件を SET_RATIOS の比率で集合へ分ける件数を、最大剰余法で求める。"""
     exact = [n * ratio for ratio in SET_RATIOS]
     base = [int(x) for x in exact]
     remainder = n - sum(base)
@@ -165,7 +164,7 @@ def split_records(records, seed):
 
 def main(argv):
     parser = argparse.ArgumentParser(
-        description="本人の文章を Y_train / Y_ref / Y_val / Y_test の4集合へ層化して振り分ける。"
+        description="本人の文章を学習データ・検証データ・テストデータの3集合へ層化して振り分ける。"
     )
     parser.add_argument(
         "input", nargs="?", default="-",
