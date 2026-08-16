@@ -16,10 +16,10 @@ import epoch  # noqa: E402
 def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
     """混同行列の4区分の件数から判定一覧を組み立てる。
 
-    genuine_correct: 正解が本人で、判別役も本人と答えた件数
-    genuine_wrong:    正解が本人だが、判別役は生成文と答えた件数
-    fake_correct:     正解が生成文で、判別役も生成文と答えた件数
-    fake_wrong:       正解が生成文だが、判別役は本人と答えた件数
+    genuine_correct: 正解が本人で、Discriminator も本人と答えた件数
+    genuine_wrong:    正解が本人だが、Discriminator は生成文と答えた件数
+    fake_correct:     正解が生成文で、Discriminator も生成文と答えた件数
+    fake_wrong:       正解が生成文だが、Discriminator は本人と答えた件数
     """
     verdicts = []
     verdicts += [{"truth": "本人", "verdict": "本人"}] * genuine_correct
@@ -85,14 +85,14 @@ class EpochSummarizeTest(unittest.TestCase):
 
 class EpochBalanceCheckTest(unittest.TestCase):
     def test_all_answers_are_fake_is_rejected(self):
-        # 判別役が中身を見ずに全部「生成文」と答えた退化ケース。
+        # Discriminator が中身を見ずに全部「生成文」と答えた退化ケース。
         verdicts = make_verdicts(genuine_correct=0, genuine_wrong=12, fake_correct=12, fake_wrong=0)
         with self.assertRaises(epoch.EpochError) as ctx:
             epoch.summarize(verdicts)
         self.assertIn("0.000", str(ctx.exception))
 
     def test_all_answers_are_genuine_is_rejected(self):
-        # 判別役が中身を見ずに全部「本人」と答えた退化ケース。
+        # Discriminator が中身を見ずに全部「本人」と答えた退化ケース。
         verdicts = make_verdicts(genuine_correct=12, genuine_wrong=0, fake_correct=0, fake_wrong=12)
         with self.assertRaises(epoch.EpochError) as ctx:
             epoch.summarize(verdicts)

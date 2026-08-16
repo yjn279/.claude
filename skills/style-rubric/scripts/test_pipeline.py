@@ -16,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import epoch  # noqa: E402
 import split  # noqa: E402
+from test_epoch import make_verdicts  # noqa: E402
 from test_split import make_records  # noqa: E402
 
 SEED = 1
@@ -54,16 +55,6 @@ def build_batch(source_ids):
         batch.append({"source_id": source_id, "role": "本人"})
         batch.append({"source_id": source_id, "role": "生成文"})
     return batch
-
-
-def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
-    """混同行列の4区分の件数から、判別役の判定一覧を組み立てる。"""
-    verdicts = []
-    verdicts += [{"truth": "本人", "verdict": "本人"}] * genuine_correct
-    verdicts += [{"truth": "本人", "verdict": "生成文"}] * genuine_wrong
-    verdicts += [{"truth": "生成文", "verdict": "生成文"}] * fake_correct
-    verdicts += [{"truth": "生成文", "verdict": "本人"}] * fake_wrong
-    return verdicts
 
 
 def balanced_convergent_verdicts(pair_count):
@@ -159,7 +150,7 @@ class PipelineEpochRecordTest(unittest.TestCase):
         self.assertFalse(is_converged(record["deception_rate"]))
 
     def test_skewed_verdicts_stop_before_the_convergence_check(self):
-        # 判別役が全サンプルに「生成文」と答えた退化ケース。収束判定へ進む前に停止する。
+        # Discriminator が全サンプルに「生成文」と答えた退化ケース。収束判定へ進む前に停止する。
         verdicts = make_verdicts(genuine_correct=0, genuine_wrong=12, fake_correct=12, fake_wrong=0)
         with self.assertRaises(epoch.EpochError):
             epoch_record(1, verdicts)
