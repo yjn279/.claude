@@ -42,6 +42,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import binomial  # noqa: E402
+import cli_io  # noqa: E402
 
 LABELS = ("本人", "生成文")
 GENUINE_ANSWER_RATE_RANGE = (0.3, 0.7)
@@ -62,6 +63,8 @@ def tally(verdicts):
 
     confusion = {"genuine": {"genuine": 0, "fake": 0}, "fake": {"genuine": 0, "fake": 0}}
     for i, sample in enumerate(verdicts):
+        if not isinstance(sample, dict):
+            raise EpochError(f"{i}件目は truth/verdict を持つオブジェクトである必要があります。")
         truth = sample.get("truth")
         verdict = sample.get("verdict")
         if truth not in LABELS or verdict not in LABELS:
@@ -122,15 +125,8 @@ def main(argv):
     )
     args = parser.parse_args(argv)
 
-    try:
-        if args.input == "-":
-            raw = sys.stdin.read()
-        else:
-            with open(args.input, encoding="utf-8") as f:
-                raw = f.read()
-        verdicts = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"入力の読み込みに失敗しました: {exc}", file=sys.stderr)
+    verdicts = cli_io.load_json_or_report(args.input)
+    if verdicts is None:
         return 1
 
     try:

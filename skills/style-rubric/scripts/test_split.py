@@ -1,8 +1,5 @@
 """split.py のテスト。python3 -m unittest discover -s skills/style-rubric/scripts で実行する。"""
-import contextlib
-import io
 import json
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -11,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import split  # noqa: E402
+from test_helpers import run_main, run_subprocess  # noqa: E402
 
 
 def make_records(n, *, topic_of=None, date_of=None, length_of=None):
@@ -35,14 +33,6 @@ def write_temp_json(records):
     json.dump(records, f)
     f.close()
     return f.name
-
-
-def run_main(argv):
-    """split.main を呼び、(戻り値, 標準出力, 標準エラー出力) を返す。"""
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = split.main(argv)
-    return code, out.getvalue(), err.getvalue()
 
 
 class SplitRecordsTest(unittest.TestCase):
@@ -126,6 +116,17 @@ class SplitRecordsTest(unittest.TestCase):
         with self.assertRaises(split.SplitError):
             split.split_records(records, seed=1)
 
+    def test_non_dict_record_is_rejected(self):
+        records = make_records(29) + ["idtext"]
+        with self.assertRaises(split.SplitError):
+            split.split_records(records, seed=1)
+
+    def test_non_string_date_is_rejected(self):
+        records = make_records(30)
+        records[0]["date"] = 20230101
+        with self.assertRaises(split.SplitError):
+            split.split_records(records, seed=1)
+
     def test_output_includes_seed_and_breakdowns(self):
         records = make_records(60)
         result = split.split_records(records, seed=99)
@@ -141,7 +142,7 @@ class SplitRecordsTest(unittest.TestCase):
 class SplitCliTest(unittest.TestCase):
     def test_main_returns_nonzero_below_minimum(self):
         path = write_temp_json(make_records(10))
-        code, _out, err = run_main(["--seed", "1", path])
+        code, _out, err = run_main(split.main, ["--seed", "1", path])
         self.assertNotEqual(code, 0)
         self.assertIn("定性モード", err)
 
@@ -151,13 +152,13 @@ class SplitCliTest(unittest.TestCase):
             if r.get("topic") is None:
                 r.pop("topic", None)
         path = write_temp_json(records)
-        code, _out, err = run_main(["--seed", "1", path])
+        code, _out, err = run_main(split.main, ["--seed", "1", path])
         self.assertNotEqual(code, 0)
         self.assertIn("話題の札", err)
 
     def test_main_succeeds_and_prints_json(self):
         path = write_temp_json(make_records(60))
-        code, out, _err = run_main(["--seed", "1", path])
+        code, out, _err = run_main(split.main, ["--seed", "1", path])
         self.assertEqual(code, 0)
         payload = json.loads(out)
         self.assertEqual(payload["counts"]["train"], 42)
@@ -166,23 +167,13 @@ class SplitCliTest(unittest.TestCase):
         # main() を直接呼ぶテストだけでなく、実際にプロセスとして起動した場合の
         # 終了コードも確認する。
         script = Path(__file__).resolve().parent / "split.py"
-        proc = subprocess.run(
-            [sys.executable, str(script), "--seed", "1"],
-            input=json.dumps(make_records(5)),
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, ["--seed", "1"], stdin=json.dumps(make_records(5)))
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("定性モード", proc.stderr)
 
     def test_subprocess_exit_code_is_zero_for_good_input(self):
         script = Path(__file__).resolve().parent / "split.py"
-        proc = subprocess.run(
-            [sys.executable, str(script), "--seed", "1"],
-            input=json.dumps(make_records(60)),
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, ["--seed", "1"], stdin=json.dumps(make_records(60)))
         self.assertEqual(proc.returncode, 0)
         payload = json.loads(proc.stdout)
         self.assertEqual(payload["counts"]["train"], 42)

@@ -1,8 +1,5 @@
 """binomial.py のテスト。python3 -m unittest discover -s skills/style-rubric/scripts で実行する。"""
-import contextlib
-import io
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -10,14 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import binomial  # noqa: E402
-
-
-def run_main(argv):
-    """binomial.main を呼び、(戻り値, 標準出力, 標準エラー出力) を返す。"""
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = binomial.main(argv)
-    return code, out.getvalue(), err.getvalue()
+from test_helpers import run_main, run_subprocess  # noqa: E402
 
 
 class BinomialTestFunctionTest(unittest.TestCase):
@@ -63,7 +53,7 @@ class BinomialTestFunctionTest(unittest.TestCase):
 
 class BinomialCliTest(unittest.TestCase):
     def test_main_prints_single_line_json_with_all_fields(self):
-        code, out, _err = run_main(["--total", "20", "--correct", "15"])
+        code, out, _err = run_main(binomial.main, ["--total", "20", "--correct", "15"])
         self.assertEqual(code, 0)
         self.assertEqual(len(out.strip().splitlines()), 1)
         payload = json.loads(out)
@@ -73,33 +63,25 @@ class BinomialCliTest(unittest.TestCase):
         self.assertAlmostEqual(payload["p_value"], 0.0414, places=4)
 
     def test_main_returns_nonzero_when_correct_exceeds_total(self):
-        code, _out, err = run_main(["--total", "10", "--correct", "11"])
+        code, _out, err = run_main(binomial.main, ["--total", "10", "--correct", "11"])
         self.assertNotEqual(code, 0)
         self.assertTrue(err)
 
     def test_main_returns_nonzero_when_total_is_not_positive(self):
-        code, _out, err = run_main(["--total", "0", "--correct", "0"])
+        code, _out, err = run_main(binomial.main, ["--total", "0", "--correct", "0"])
         self.assertNotEqual(code, 0)
         self.assertTrue(err)
 
     def test_subprocess_exit_code_is_zero_for_good_input(self):
         script = Path(__file__).resolve().parent / "binomial.py"
-        proc = subprocess.run(
-            [sys.executable, str(script), "--total", "10", "--correct", "10"],
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, ["--total", "10", "--correct", "10"])
         self.assertEqual(proc.returncode, 0)
         payload = json.loads(proc.stdout)
         self.assertEqual(payload["p_value"], 0.001953125)
 
     def test_subprocess_exit_code_is_nonzero_for_bad_input(self):
         script = Path(__file__).resolve().parent / "binomial.py"
-        proc = subprocess.run(
-            [sys.executable, str(script), "--total", "-1", "--correct", "0"],
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, ["--total", "-1", "--correct", "0"])
         self.assertNotEqual(proc.returncode, 0)
 
 

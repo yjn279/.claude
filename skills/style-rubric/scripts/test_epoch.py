@@ -1,8 +1,6 @@
 """epoch.py のテスト。python3 -m unittest discover -s skills/style-rubric/scripts で実行する。"""
-import contextlib
 import io
 import json
-import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -11,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import binomial  # noqa: E402
 import epoch  # noqa: E402
+from test_helpers import run_main, run_subprocess  # noqa: E402
 
 
 def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
@@ -27,14 +26,6 @@ def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
     verdicts += [{"truth": "生成文", "verdict": "生成文"}] * fake_correct
     verdicts += [{"truth": "生成文", "verdict": "本人"}] * fake_wrong
     return verdicts
-
-
-def run_main(argv):
-    """epoch.main を呼び、(戻り値, 標準出力, 標準エラー出力) を返す。"""
-    out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = epoch.main(argv)
-    return code, out.getvalue(), err.getvalue()
 
 
 class EpochSummarizeTest(unittest.TestCase):
@@ -82,6 +73,10 @@ class EpochSummarizeTest(unittest.TestCase):
         with self.assertRaises(epoch.EpochError):
             epoch.summarize([{"truth": "本人", "verdict": "不明"}])
 
+    def test_non_dict_entry_is_rejected(self):
+        with self.assertRaises(epoch.EpochError):
+            epoch.summarize(["本人"])
+
 
 class EpochBalanceCheckTest(unittest.TestCase):
     def test_all_answers_are_fake_is_rejected(self):
@@ -123,7 +118,7 @@ class EpochCliTest(unittest.TestCase):
         stdin_backup = sys.stdin
         sys.stdin = io.StringIO(json.dumps(verdicts))
         try:
-            code, out, _err = run_main(["-"])
+            code, out, _err = run_main(epoch.main, ["-"])
         finally:
             sys.stdin = stdin_backup
 
@@ -139,7 +134,7 @@ class EpochCliTest(unittest.TestCase):
         stdin_backup = sys.stdin
         sys.stdin = io.StringIO(json.dumps(verdicts))
         try:
-            code, _out, err = run_main(["-"])
+            code, _out, err = run_main(epoch.main, ["-"])
         finally:
             sys.stdin = stdin_backup
 
@@ -149,12 +144,7 @@ class EpochCliTest(unittest.TestCase):
     def test_subprocess_exit_code_is_zero_for_balanced_input(self):
         verdicts = make_verdicts(genuine_correct=9, genuine_wrong=3, fake_correct=8, fake_wrong=4)
         script = Path(__file__).resolve().parent / "epoch.py"
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            input=json.dumps(verdicts),
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, [], stdin=json.dumps(verdicts))
         self.assertEqual(proc.returncode, 0)
         payload = json.loads(proc.stdout)
         self.assertEqual(payload["total"], 24)
@@ -162,12 +152,7 @@ class EpochCliTest(unittest.TestCase):
     def test_subprocess_exit_code_is_nonzero_for_skewed_input(self):
         verdicts = make_verdicts(genuine_correct=0, genuine_wrong=12, fake_correct=12, fake_wrong=0)
         script = Path(__file__).resolve().parent / "epoch.py"
-        proc = subprocess.run(
-            [sys.executable, str(script)],
-            input=json.dumps(verdicts),
-            capture_output=True,
-            text=True,
-        )
+        proc = run_subprocess(script, [], stdin=json.dumps(verdicts))
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("倒れています", proc.stderr)
 

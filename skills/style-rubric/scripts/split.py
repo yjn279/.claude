@@ -35,6 +35,11 @@ import json
 import random
 import sys
 from datetime import date
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import cli_io  # noqa: E402
 
 SET_NAMES = ("train", "validation", "test")
 SET_RATIOS = (0.7, 0.2, 0.1)
@@ -58,7 +63,7 @@ def _validate_records(records):
 
     seen_ids = set()
     for record in records:
-        if "id" not in record or "text" not in record:
+        if not isinstance(record, dict) or "id" not in record or "text" not in record:
             raise SplitError("各文章には id と text が必要です。")
         rid = record["id"]
         if rid in seen_ids:
@@ -93,7 +98,7 @@ def _stratum_keys(records):
             continue
         try:
             dated[r["id"]] = date.fromisoformat(raw_date).toordinal()
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise SplitError(f"日付の形式が不正です: {r['id']!r} -> {raw_date!r}") from exc
     period_bucket = _rank_buckets(dated, BUCKET_COUNT) if dated else {}
 
@@ -173,15 +178,8 @@ def main(argv):
     parser.add_argument("--seed", type=int, required=True, help="振り分けに使う乱数の種")
     args = parser.parse_args(argv)
 
-    try:
-        if args.input == "-":
-            raw = sys.stdin.read()
-        else:
-            with open(args.input, encoding="utf-8") as f:
-                raw = f.read()
-        records = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
-        print(f"入力の読み込みに失敗しました: {exc}", file=sys.stderr)
+    records = cli_io.load_json_or_report(args.input)
+    if records is None:
         return 1
 
     try:
