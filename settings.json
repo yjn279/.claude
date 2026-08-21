@@ -3,6 +3,19 @@
   "permissions": {
     "defaultMode": "auto"
   },
+  "hooks": {
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/scripts/fable-advice/advise.mjs\"",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  },
   "enabledPlugins": {
     "claude-md-management@claude-plugins-official": true,
     "feature-dev@claude-plugins-official": true,
