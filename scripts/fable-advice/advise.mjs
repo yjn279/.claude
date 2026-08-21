@@ -4,14 +4,16 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
-const ROLE = `あなたはエグゼクティブコーチです。
-与えられた内容について、本当の目的に最短で辿り着けるよう、抽象的でシンプルな問いかけを考えてください。問いのみを端的に出力すること。`;
+const ROLE = `You are an executive coach.
+For the given content, devise abstract and simple questions that lead to the true objective by the shortest path. Output only the questions, concisely.`;
 
-// Fable にはこの設定を読ませない。周りの指示に染まらない、外からの目として答えさせるため。
+// 要約は対象者自身の言葉で書かれている。誰の何であるかを囲んで示すことで、
+// 続きを書く側ではなく、外から問う側として読ませる。
+const summary = JSON.parse(fs.readFileSync(0, "utf8")).compact_summary;
 const asked = spawnSync(
   "claude",
   ["--print", "--safe-mode", "--no-session-persistence", "--model", "claude-fable-5", "--system-prompt", ROLE],
-  { input: JSON.parse(fs.readFileSync(0, "utf8")).compact_summary, encoding: "utf8" },
+  { input: `<coachee_work_summary>\n${summary}\n</coachee_work_summary>`, encoding: "utf8" },
 );
 
 if (asked.status !== 0) {
