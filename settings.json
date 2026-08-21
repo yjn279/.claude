@@ -4,7 +4,7 @@
     "defaultMode": "auto"
   },
   "hooks": {
-    "PostToolBatch": [
+    "PostCompact": [
       {
         "hooks": [
           {

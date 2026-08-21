@@ -21,7 +21,7 @@
 │   ├── humanizer/                  # git submodule → https://github.com/blader/humanizer
 │   └── documentation/SKILL.md
 ├── scripts/
-│   └── fable-advice/               # 作業の途中で Fable に助言を求めるフックの実行ファイル
+│   └── fable-advice/               # 会話が要約されたあと Fable に問いかけを求めるフックの実行ファイル
 ├── settings.json               # 個人用フックと汎用 dev ツールの permissions
 └── README.md
 ```
