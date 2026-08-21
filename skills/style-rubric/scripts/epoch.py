@@ -1,20 +1,6 @@
 #!/usr/bin/env python3
 """1エポック分の判定一覧から、混同行列・見破られ率・p 値を求める。
 
-Discriminator（見本を参照し、提示された1件の文章が本人の筆か生成文かを判定する言語モデル
-呼び出し）は、本人の文章と生成文を半々に混ぜたバッチを1サンプルずつ判定する。その判定一覧
-（各サンプルの正解が本人か生成文か、Discriminator が本人と答えたか生成文と答えたか）を受け取り、
-混同行列を数え上げたうえで、見破られ率（Discriminator の正答率）と、その正答率が偶然（50%）と
-有意差があるかを示す p 値を binomial.py の計算で求める。見破られ率が 0.5 に近いほど、
-生成文と本人の文章が区別できなくなっていることを表す代理指標である。計算そのものは
-binomial.py にしかなく、ここでは二重に持たない。
-
-このスクリプトはあわせて、判定結果が一方へ倒れていないかを検査する。半々のバッチで
-Discriminator が中身を見ずに全部「生成文」と答えるだけでも見破られ率はちょうど 0.5 になってしまう、
-1サンプルずつ独立に判定する形に固有の退化がある。これを塞ぐため、「本人」と答えた割合が
-0.3〜0.7 の範囲（両端を含む）を外れていないかを検査し、外れていれば代替値で続行せず
-理由を示して異常終了する。これは条件分岐ではなくアサーションである。
-
 入力（標準入力または引数のファイルパスから読む JSON）:
     次のオブジェクトのリスト。
     - "truth"   （必須）正解。"本人" または "生成文"
@@ -37,12 +23,8 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from math import comb
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import binomial  # noqa: E402
-import cli_io  # noqa: E402
 
 LABELS = ("本人", "生成文")
 GENUINE_ANSWER_RATE_RANGE = (0.3, 0.7)
@@ -52,8 +34,28 @@ class EpochError(Exception):
     """判定一覧の集計の前提が崩れているときに送出する。"""
 
 
+def _load_verdicts(path):
+    """path が "-" なら標準入力から、それ以外ならファイルから JSON を読み込む。
+
+    失敗すれば理由を標準エラー出力へ書いて None を返す。
+    """
+    try:
+        raw = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+        return json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"入力の読み込みに失敗しました: {exc}", file=sys.stderr)
+        return None
+
+
 def _label_key(label):
     return "genuine" if label == "本人" else "fake"
+
+
+def _binomial_p_value(total, correct):
+    """total 件中 correct 件正答のとき、正答率が50%と有意差なしという仮説のもとでの両側 p 値を返す。"""
+    tail_start = max(correct, total - correct)
+    tail = sum(comb(total, k) for k in range(tail_start, total + 1))
+    return min(1.0, 2 * tail / (2 ** total))
 
 
 def tally(verdicts):
@@ -104,7 +106,8 @@ def summarize(verdicts):
     genuine_answer_rate = check_balance(confusion, total)
 
     correct = confusion["genuine"]["genuine"] + confusion["fake"]["fake"]
-    deception_rate, p_value = binomial.binomial_test(total, correct)
+    deception_rate = correct / total
+    p_value = _binomial_p_value(total, correct)
 
     return {
         "total": total,
@@ -125,7 +128,7 @@ def main(argv):
     )
     args = parser.parse_args(argv)
 
-    verdicts = cli_io.load_json_or_report(args.input)
+    verdicts = _load_verdicts(args.input)
     if verdicts is None:
         return 1
 

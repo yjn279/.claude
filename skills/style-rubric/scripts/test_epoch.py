@@ -1,15 +1,40 @@
 """epoch.py のテスト。python3 -m unittest discover -s skills/style-rubric/scripts で実行する。"""
+from __future__ import annotations
+
+import contextlib
 import io
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import binomial  # noqa: E402
 import epoch  # noqa: E402
-from test_helpers import run_main, run_subprocess  # noqa: E402
+import split  # noqa: E402
+from test_split import make_records  # noqa: E402
+
+SEED = 1
+DECEPTION_THRESHOLD = 0.6  # 見破られ率がこの値未満なら収束とみなす。
+
+
+def run_main(main_func, argv):
+    """main_func(argv) を呼び、(戻り値, 標準出力, 標準エラー出力) を返す。"""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = main_func(argv)
+    return code, out.getvalue(), err.getvalue()
+
+
+def run_subprocess(script_path, args, stdin=None):
+    """script_path を別プロセスとして実行し、subprocess.CompletedProcess を返す。"""
+    return subprocess.run(
+        [sys.executable, str(script_path), *args],
+        input=stdin,
+        capture_output=True,
+        text=True,
+    )
 
 
 def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
@@ -26,6 +51,15 @@ def make_verdicts(genuine_correct, genuine_wrong, fake_correct, fake_wrong):
     verdicts += [{"truth": "生成文", "verdict": "生成文"}] * fake_correct
     verdicts += [{"truth": "生成文", "verdict": "本人"}] * fake_wrong
     return verdicts
+
+
+def build_batch(source_ids):
+    """本人の文章の id 一覧から、本人と生成文が半々のバッチを組む。"""
+    batch = []
+    for source_id in source_ids:
+        batch.append({"source_id": source_id, "role": "本人"})
+        batch.append({"source_id": source_id, "role": "生成文"})
+    return batch
 
 
 class EpochSummarizeTest(unittest.TestCase):
@@ -56,15 +90,6 @@ class EpochSummarizeTest(unittest.TestCase):
         correct = result["confusion"]["genuine"]["genuine"] + result["confusion"]["fake"]["fake"]
         self.assertEqual(result["deception_rate"], correct / result["total"])
 
-    def test_rate_and_p_value_match_binomial_module_called_with_same_numbers(self):
-        verdicts = make_verdicts(genuine_correct=9, genuine_wrong=3, fake_correct=8, fake_wrong=4)
-        result = epoch.summarize(verdicts)
-
-        correct = result["confusion"]["genuine"]["genuine"] + result["confusion"]["fake"]["fake"]
-        expected_rate, expected_p_value = binomial.binomial_test(result["total"], correct)
-        self.assertEqual(result["deception_rate"], expected_rate)
-        self.assertEqual(result["p_value"], expected_p_value)
-
     def test_empty_input_is_rejected(self):
         with self.assertRaises(epoch.EpochError):
             epoch.summarize([])
@@ -76,6 +101,50 @@ class EpochSummarizeTest(unittest.TestCase):
     def test_non_dict_entry_is_rejected(self):
         with self.assertRaises(epoch.EpochError):
             epoch.summarize(["本人"])
+
+
+class EpochPValueTest(unittest.TestCase):
+    def test_twelve_of_twenty_matches_previous_implementation(self):
+        # 20件中12件正答、見破られ率0.6。
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=6, fake_wrong=4)
+        result = epoch.summarize(verdicts)
+        self.assertEqual(result["deception_rate"], 0.6)
+        self.assertAlmostEqual(result["p_value"], 0.5034, places=4)
+
+    def test_eleven_of_twenty_matches_previous_implementation(self):
+        # 20件中11件正答、見破られ率0.55。
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=5, fake_wrong=5)
+        result = epoch.summarize(verdicts)
+        self.assertEqual(result["deception_rate"], 0.55)
+        self.assertAlmostEqual(result["p_value"], 0.8238, places=4)
+
+    def test_exact_half_gives_p_value_of_one(self):
+        verdicts = make_verdicts(genuine_correct=5, genuine_wrong=5, fake_correct=5, fake_wrong=5)
+        self.assertEqual(epoch.summarize(verdicts)["p_value"], 1.0)
+
+    def test_fifteen_of_twenty_is_significant(self):
+        verdicts = make_verdicts(genuine_correct=8, genuine_wrong=2, fake_correct=7, fake_wrong=3)
+        p_value = epoch.summarize(verdicts)["p_value"]
+        self.assertAlmostEqual(p_value, 0.0414, places=4)
+        self.assertLess(p_value, 0.05)
+
+    def test_fourteen_of_twenty_is_not_significant(self):
+        verdicts = make_verdicts(genuine_correct=7, genuine_wrong=3, fake_correct=7, fake_wrong=3)
+        p_value = epoch.summarize(verdicts)["p_value"]
+        self.assertAlmostEqual(p_value, 0.1153, places=4)
+        self.assertGreater(p_value, 0.05)
+
+    def test_all_correct_out_of_ten(self):
+        verdicts = make_verdicts(genuine_correct=5, genuine_wrong=0, fake_correct=5, fake_wrong=0)
+        self.assertEqual(epoch.summarize(verdicts)["p_value"], 0.001953125)
+
+    def test_swapping_correct_and_incorrect_keeps_p_value(self):
+        mostly_correct = make_verdicts(genuine_correct=8, genuine_wrong=2, fake_correct=7, fake_wrong=3)
+        mostly_wrong = make_verdicts(genuine_correct=2, genuine_wrong=8, fake_correct=3, fake_wrong=7)
+        self.assertEqual(
+            epoch.summarize(mostly_correct)["p_value"],
+            epoch.summarize(mostly_wrong)["p_value"],
+        )
 
 
 class EpochBalanceCheckTest(unittest.TestCase):
@@ -113,7 +182,7 @@ class EpochBalanceCheckTest(unittest.TestCase):
 
 
 class EpochCliTest(unittest.TestCase):
-    def test_main_prints_single_line_json_with_all_fields(self):
+    def test_main_prints_json_with_all_fields(self):
         verdicts = make_verdicts(genuine_correct=9, genuine_wrong=3, fake_correct=8, fake_wrong=4)
         stdin_backup = sys.stdin
         sys.stdin = io.StringIO(json.dumps(verdicts))
@@ -155,6 +224,45 @@ class EpochCliTest(unittest.TestCase):
         proc = run_subprocess(script, [], stdin=json.dumps(verdicts))
         self.assertNotEqual(proc.returncode, 0)
         self.assertIn("倒れています", proc.stderr)
+
+
+class PipelineFlowTest(unittest.TestCase):
+    """60件規模の実例で、分割から集計までの数値の流れが破綻なく通ることを確かめる。"""
+
+    def test_validation_and_test_batches_are_built_without_reusing_text(self):
+        records = make_records(60)
+        result = split.split_records(records, seed=SEED)
+        validation_ids = result["assignments"]["validation"]
+        test_ids = result["assignments"]["test"]
+        self.assertEqual(len(validation_ids), 12)
+        self.assertEqual(len(test_ids), 6)
+        self.assertTrue(set(validation_ids).isdisjoint(test_ids))
+
+        validation_batch = build_batch(validation_ids)
+        test_batch = build_batch(test_ids)
+        self.assertEqual(len(validation_batch), 24)
+        self.assertEqual(len(test_batch), 12)
+
+        for batch, ids in ((validation_batch, validation_ids), (test_batch, test_ids)):
+            for source_id in ids:
+                uses = [s for s in batch if s["source_id"] == source_id]
+                self.assertEqual(len(uses), 2)
+                self.assertEqual({s["role"] for s in uses}, {"本人", "生成文"})
+
+    def test_epoch_summary_contains_every_field_report_needs(self):
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=6, fake_wrong=4)
+        result = epoch.summarize(verdicts)
+        self.assertEqual(
+            set(result),
+            {"total", "confusion", "deception_rate", "p_value", "genuine_answer_rate"},
+        )
+
+    def test_deception_rate_of_point_six_is_not_yet_convergence(self):
+        # 20件中12件正答で見破られ率0.6。閾値は「未満」で収束のため、ちょうど0.6は収束しない。
+        verdicts = make_verdicts(genuine_correct=6, genuine_wrong=4, fake_correct=6, fake_wrong=4)
+        deception_rate = epoch.summarize(verdicts)["deception_rate"]
+        self.assertEqual(deception_rate, 0.6)
+        self.assertFalse(deception_rate < DECEPTION_THRESHOLD)
 
 
 if __name__ == "__main__":
