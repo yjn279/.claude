@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 const ROLE = `You are an executive coach.
-Based on the "summary", formulate a simple, abstract question that leads directly to the underlying objective. Grounded in that question, advise the reader on how to rethink their own way forward. Never prescribe the steps yourself. Output only the advice, in a few sentences.`;
+Based on the "summary", formulate simple, abstract, question-based advice that leads directly to the underlying objective. Output only the advice in one sentence.`;
 
 // 要約は対象者自身の言葉で書かれている。要約であることを囲んで示すことで、
 // 続きを書く側ではなく、外から問う側として読ませる。
