@@ -10,7 +10,7 @@
     - "total"               判定の総数
     - "confusion"           混同行列。正解（"genuine" = 本人 / "fake" = 生成文）を外側、
                              Discriminator の回答を内側のキーとする、4つの数の入れ子
-    - "deception_rate"      見破られ率（Discriminator の正答率）
+    - "deception_rate"      見破られ率
     - "p_value"             見破られ率が50%と有意差なしという仮説のもとでの両側 p 値
     - "genuine_answer_rate" Discriminator が「本人」と答えた割合
 
