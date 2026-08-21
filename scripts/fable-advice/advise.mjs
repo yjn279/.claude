@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// 会話が要約されたあと、その要約を Fable に読ませ、返ってきた問いを Claude へ渡す。
+// 会話が要約されたあと、その要約を Fable に読ませ、返ってきた助言を Claude へ渡す。
 // 長く一人で作業するうちに下がった視座を、目的まで引き上げるために置く。
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 const ROLE = `You are an executive coach.
-Based on the "summary", formulate a simple, abstract question that leads directly to the underlying objective. Then urge the reader to rethink their own way forward in light of that question. Never prescribe the steps yourself. Output only the question and the urging.`;
+Based on the "summary", formulate a simple, abstract question that leads directly to the underlying objective. Grounded in that question, advise the reader on how to rethink their own way forward. Never prescribe the steps yourself. Output only the advice, in a few sentences.`;
 
 // 要約は対象者自身の言葉で書かれている。要約であることを囲んで示すことで、
 // 続きを書く側ではなく、外から問う側として読ませる。
