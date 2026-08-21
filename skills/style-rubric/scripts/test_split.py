@@ -1,5 +1,8 @@
 """split.py のテスト。python3 -m unittest discover -s skills/style-rubric/scripts で実行する。"""
+import contextlib
+import io
 import json
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -8,7 +11,24 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import split  # noqa: E402
-from test_helpers import run_main, run_subprocess  # noqa: E402
+
+
+def run_main(main_func, argv):
+    """main_func(argv) を呼び、(戻り値, 標準出力, 標準エラー出力) を返す。"""
+    out, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+        code = main_func(argv)
+    return code, out.getvalue(), err.getvalue()
+
+
+def run_subprocess(script_path, args, stdin=None):
+    """script_path を別プロセスとして実行し、subprocess.CompletedProcess を返す。"""
+    return subprocess.run(
+        [sys.executable, str(script_path), *args],
+        input=stdin,
+        capture_output=True,
+        text=True,
+    )
 
 
 def make_records(n, *, topic_of=None, date_of=None, length_of=None):
@@ -106,7 +126,7 @@ class SplitRecordsTest(unittest.TestCase):
         records = make_records(29)
         with self.assertRaises(split.SplitError) as ctx:
             split.split_records(records, seed=1)
-        self.assertIn("定性モード", str(ctx.exception))
+        self.assertIn("30件", str(ctx.exception))
 
     def test_partial_topic_labels_are_rejected(self):
         records = make_records(30, topic_of=lambda i: "A" if i < 10 else None)
@@ -144,7 +164,7 @@ class SplitCliTest(unittest.TestCase):
         path = write_temp_json(make_records(10))
         code, _out, err = run_main(split.main, ["--seed", "1", path])
         self.assertNotEqual(code, 0)
-        self.assertIn("定性モード", err)
+        self.assertIn("30件", err)
 
     def test_main_returns_nonzero_on_partial_topic(self):
         records = make_records(30, topic_of=lambda i: "A" if i < 5 else None)
@@ -169,7 +189,7 @@ class SplitCliTest(unittest.TestCase):
         script = Path(__file__).resolve().parent / "split.py"
         proc = run_subprocess(script, ["--seed", "1"], stdin=json.dumps(make_records(5)))
         self.assertNotEqual(proc.returncode, 0)
-        self.assertIn("定性モード", proc.stderr)
+        self.assertIn("30件", proc.stderr)
 
     def test_subprocess_exit_code_is_zero_for_good_input(self):
         script = Path(__file__).resolve().parent / "split.py"

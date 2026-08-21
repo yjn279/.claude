@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-"""本人の文章を学習データ・検証データ・テストデータの3集合へ層化して振り分ける。
-
-集合の役割:
-- train（70%）     ルーブリック生成の材料。および Discriminator へ渡す見本
-- validation（20%） 条件抽出の材料。および判別バッチの本人側サンプル
-- test（10%）       テスト評価専用。学習ループ中は一度も参照しない
-
-時期・長さ・話題の偏りが各集合へ均等に散るよう、この3項目を組み合わせた層ごとに
-比率どおりの人数を割り当てる。長さは文章の文字数から、時期は日付から、この
-スクリプトが自動で求める。話題だけは文章そのものから機械的に決まらないため、
-呼び出し側が1件ごとに札（ラベル）を添える。
+"""本人の文章を train・validation・test の3集合へ層化して振り分ける。
 
 入力（標準入力または引数のファイルパスから読む JSON）:
     次のオブジェクトのリスト。
     - "id"   （必須）文章を一意に識別する文字列
-    - "text" （必須）書きぶりと関係のない定型部分を除いたあとの本文
-    - "date" （任意）"YYYY-MM-DD" 形式の日付。時期の層に使う
+    - "text" （必須）本文
+    - "date" （任意）"YYYY-MM-DD" 形式の日付
     - "topic"（任意）話題を表す短い札。一部の文章にだけ付けることはできない
 
 出力（標準出力への JSON、終了コード0）:
@@ -25,8 +15,8 @@
     - "strata"      層ごとの内訳（層の構成・件数・集合ごとの件数）
     - "assignments" 集合ごとに振り分けられた id の一覧
 
-前提が崩れている場合（30件未満の入力、話題の札が一部だけ付いている入力など）は、
-理由を標準エラー出力へ書いて終了コード1で異常終了する。
+前提が崩れている場合（30件未満の入力、id の重複、話題の札が一部だけ付いている
+入力、日付の形式不正など）は、理由を標準エラー出力へ書いて終了コード1で異常終了する。
 """
 from __future__ import annotations
 
@@ -36,10 +26,6 @@ import random
 import sys
 from datetime import date
 from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-
-import cli_io  # noqa: E402
 
 SET_NAMES = ("train", "validation", "test")
 SET_RATIOS = (0.7, 0.2, 0.1)
@@ -51,6 +37,19 @@ class SplitError(Exception):
     """振り分けの前提が崩れているときに送出する。"""
 
 
+def _load_records(path):
+    """path が "-" なら標準入力から、それ以外ならファイルから JSON を読み込む。
+
+    失敗すれば理由を標準エラー出力へ書いて None を返す。
+    """
+    try:
+        raw = sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
+        return json.loads(raw)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"入力の読み込みに失敗しました: {exc}", file=sys.stderr)
+        return None
+
+
 def _validate_records(records):
     if not isinstance(records, list):
         raise SplitError("入力は文章オブジェクトのリストである必要があります。")
@@ -58,7 +57,6 @@ def _validate_records(records):
     if len(records) < MIN_RECORDS_FOR_ITERATION:
         raise SplitError(
             f"入力が{len(records)}件です。30件を下回るため統計的な収束判定は成立しません。"
-            "反復と検定は行わず、規則の記述だけを作る定性モードに切り替えてください。"
         )
 
     seen_ids = set()
@@ -169,7 +167,7 @@ def split_records(records, seed):
 
 def main(argv):
     parser = argparse.ArgumentParser(
-        description="本人の文章を学習データ・検証データ・テストデータの3集合へ層化して振り分ける。"
+        description="本人の文章を train・validation・test の3集合へ層化して振り分ける。"
     )
     parser.add_argument(
         "input", nargs="?", default="-",
@@ -178,7 +176,7 @@ def main(argv):
     parser.add_argument("--seed", type=int, required=True, help="振り分けに使う乱数の種")
     args = parser.parse_args(argv)
 
-    records = cli_io.load_json_or_report(args.input)
+    records = _load_records(args.input)
     if records is None:
         return 1
 
