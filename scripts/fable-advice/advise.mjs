@@ -7,13 +7,13 @@ import fs from "node:fs";
 const ROLE = `You are an executive coach.
 For the given content, devise abstract and simple questions that lead to the true objective by the shortest path. Output only the questions, concisely.`;
 
-// 要約は対象者自身の言葉で書かれている。誰の何であるかを囲んで示すことで、
+// 要約は対象者自身の言葉で書かれている。要約であることを囲んで示すことで、
 // 続きを書く側ではなく、外から問う側として読ませる。
 const summary = JSON.parse(fs.readFileSync(0, "utf8")).compact_summary;
 const asked = spawnSync(
   "claude",
   ["--print", "--safe-mode", "--no-session-persistence", "--model", "claude-fable-5", "--system-prompt", ROLE],
-  { input: `<coachee_work_summary>\n${summary}\n</coachee_work_summary>`, encoding: "utf8" },
+  { input: `<summary>\n${summary}\n</summary>`, encoding: "utf8" },
 );
 
 if (asked.status !== 0) {
