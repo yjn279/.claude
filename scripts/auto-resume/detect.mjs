@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 会話が使用量の上限で止まったかを判定し、解除の時刻に一度だけ起きる予約を登録する。
+// 会話が使用量の上限で止まったかを判定し、解除の時刻まで待って、その会話を再開する。
 // StopFailure フックから標準入力で呼ばれる。
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -11,8 +11,6 @@ const CONFIG = JSON.parse(fs.readFileSync(path.join(HERE, "config.json"), "utf8"
 const CLAUDE_HOME = process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
 const STATE_FILE = path.join(CLAUDE_HOME, "auto-resume", "state.json");
 const LOG_DIR = path.join(CLAUDE_HOME, "resume-logs");
-const AGENT_DIR = path.join(os.homedir(), "Library", "LaunchAgents");
-const LABEL_PREFIX = "com.claude.auto-resume";
 
 // 「You've hit your session limit · resets 9:10pm (Asia/Tokyo)」の形を読む。
 const LIMIT_RE = /hit your [^.\n]*limit/i;
@@ -31,6 +29,8 @@ function readStdin() {
     return "";
   }
 }
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 /** 指定の地域における、その時刻の世界標準時からのずれ（ミリ秒）。 */
 function zoneOffsetMs(zone, date) {
@@ -95,9 +95,20 @@ function readState() {
   }
 }
 
-function writeState(state) {
+function updateState(sessionId, entry) {
+  const state = readState();
+  state[sessionId] = { ...state[sessionId], ...entry };
   fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
   fs.writeFileSync(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`);
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function which(command) {
@@ -107,82 +118,60 @@ function which(command) {
   return line;
 }
 
-function plistXml({ label, args, workdir, logPath, at }) {
-  const argXml = args.map((a) => `    <string>${a.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</string>`).join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>${label}</string>
-  <key>ProgramArguments</key>
-  <array>
-${argXml}
-  </array>
-  <key>WorkingDirectory</key><string>${workdir}</string>
-  <key>StartCalendarInterval</key>
-  <dict>
-    <key>Month</key><integer>${at.getMonth() + 1}</integer>
-    <key>Day</key><integer>${at.getDate()}</integer>
-    <key>Hour</key><integer>${at.getHours()}</integer>
-    <key>Minute</key><integer>${at.getMinutes()}</integer>
-  </dict>
-  <key>StandardOutPath</key><string>${logPath}</string>
-  <key>StandardErrorPath</key><string>${logPath}</string>
-  <key>RunAtLoad</key><false/>
-</dict>
-</plist>
-`;
-}
-
-function schedule({ sessionId, cwd, at }) {
-  const label = `${LABEL_PREFIX}.${sessionId}`;
-  const plistPath = path.join(AGENT_DIR, `${label}.plist`);
-  const loaded = spawnSync("/bin/launchctl", ["print", `gui/${process.getuid()}/${label}`], { stdio: "ignore" });
-  if (fs.existsSync(plistPath) || loaded.status === 0) return { label, plistPath, skipped: true };
-
-  const stamp = `${at.getFullYear()}${`${at.getMonth() + 1}`.padStart(2, "0")}${`${at.getDate()}`.padStart(2, "0")}`
-    + `-${`${at.getHours()}`.padStart(2, "0")}${`${at.getMinutes()}`.padStart(2, "0")}`;
-  const logPath = path.join(LOG_DIR, `${stamp}_${sessionId}.log`);
-  fs.mkdirSync(LOG_DIR, { recursive: true });
-  fs.mkdirSync(AGENT_DIR, { recursive: true });
-
-  const args = [
-    "/usr/bin/caffeinate", "-i",
-    "/bin/bash", path.join(HERE, "resume.sh"),
-    sessionId, cwd, which("claude"), CONFIG.resumePrompt, label, String(Math.floor(at.getTime() / 1000)),
-  ];
-  fs.writeFileSync(plistPath, plistXml({ label, args, workdir: cwd, logPath, at }));
-
-  const boot = spawnSync("/bin/launchctl", ["bootstrap", `gui/${process.getuid()}`, plistPath], { encoding: "utf8" });
-  if (boot.status !== 0) {
-    fs.rmSync(plistPath, { force: true });
-    throw new Error(`予約の登録に失敗した: ${boot.stderr.trim()}`);
-  }
-  return { label, plistPath, logPath, skipped: false };
-}
-
+/** 待つべきかを決める。待たないときは、その理由の文字列を返す。 */
 function decide(payload) {
-  const { session_id: sessionId, cwd, last_assistant_message: text } = payload;
-  if (!sessionId || !cwd || !text) return `入力が足りない: ${JSON.stringify(payload)}`;
+  const { session_id: sessionId, cwd, transcript_path: transcript, last_assistant_message: text } = payload;
+  if (!sessionId || !cwd || !transcript || !text) return `入力が足りない: ${JSON.stringify(payload)}`;
   if (!LIMIT_RE.test(text)) return `${sessionId}: 上限の文面ではない`;
 
   const now = new Date();
   const epoch = resetEpoch(text, now);
   if (epoch === null) return `${sessionId}: 解除の時刻が読めない（${text}）`;
 
-  const state = readState();
-  const count = state[sessionId]?.count ?? 0;
+  const waiting = readState()[sessionId];
+  if (waiting?.pid && alive(waiting.pid)) return `${sessionId}: 同じ会話を既に待っている。何もしない`;
+
+  const count = waiting?.count ?? 0;
   if (count >= CONFIG.maxResumesPerSession) return `${sessionId}: 再開 ${count} 回に達した。諦める`;
 
   const at = new Date(epoch + CONFIG.resetBufferMinutes * 60_000);
   at.setSeconds(0, 0);
 
-  const result = schedule({ sessionId, cwd, at });
-  if (result.skipped) return `${sessionId}: 同じ予約が既にある。何もしない`;
+  updateState(sessionId, { count: count + 1, scheduledFor: at.toISOString(), cwd, transcript, pid: process.pid });
+  return { sessionId, cwd, transcript, at, count: count + 1 };
+}
 
-  state[sessionId] = { count: count + 1, scheduledFor: at.toISOString(), cwd };
-  writeState(state);
-  return `${sessionId}: ${at.toISOString()} に再開を予約した（通算 ${count + 1} 回目）`;
+/** 解除の時刻まで待ち、会話を再開する。 */
+async function waitAndResume({ sessionId, cwd, transcript, at }) {
+  // 眠りから覚めた分もそのまま数えるため、実時刻を繰り返し見比べて待つ。
+  while (Date.now() < at.getTime()) await sleep(Math.min(30_000, at.getTime() - Date.now()));
+
+  const lateMinutes = Math.round((Date.now() - at.getTime()) / 60_000);
+  if (lateMinutes > CONFIG.lateLimitMinutes) {
+    updateState(sessionId, { pid: null, result: `${lateMinutes} 分の遅れで見送り` });
+    return `${sessionId}: 予定より ${lateMinutes} 分遅れたため再開しない`;
+  }
+  if (!fs.existsSync(transcript)) {
+    updateState(sessionId, { pid: null, result: "会話の記録がない" });
+    return `${sessionId}: 会話の記録が見つからない（${transcript}）`;
+  }
+
+  const now = new Date();
+  const stamp = `${now.getFullYear()}${`${now.getMonth() + 1}`.padStart(2, "0")}${`${now.getDate()}`.padStart(2, "0")}`
+    + `-${`${now.getHours()}`.padStart(2, "0")}${`${now.getMinutes()}`.padStart(2, "0")}`;
+  const logPath = path.join(LOG_DIR, `${stamp}_${sessionId}.log`);
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+  const out = fs.openSync(logPath, "a");
+
+  // 再開のあいだは端末を眠らせない。
+  const child = spawn("/usr/bin/caffeinate", ["-i", which("claude"), "--resume", sessionId, "--print", CONFIG.resumePrompt], {
+    cwd, stdio: ["ignore", out, out],
+  });
+  const status = await new Promise((done) => child.on("exit", (code) => done(code ?? -1)));
+  fs.closeSync(out);
+
+  updateState(sessionId, { pid: null, result: `再開の終了コード ${status}` });
+  return `${sessionId}: 再開して終了コード ${status}（出力は ${logPath}）`;
 }
 
 // 有効・無効の切り替え。設定ファイルか環境変数のどちらでも止められる。
@@ -192,11 +181,17 @@ if (CONFIG.enabled !== true || /^(0|off|false)$/i.test(process.env.CLAUDE_AUTO_R
 
 const workerPayload = process.argv[2] === "--worker" ? process.argv[3] : null;
 if (workerPayload) {
-  // 切り離された子。判定と予約はここで行う。
+  // 切り離した子。判定と、解除の時刻までの待機と、再開をここで行う。
   const payload = JSON.parse(fs.readFileSync(workerPayload, "utf8"));
   fs.rmSync(workerPayload, { force: true });
   try {
-    log(decide(payload));
+    const decided = decide(payload);
+    if (typeof decided === "string") {
+      log(decided);
+    } else {
+      log(`${decided.sessionId}: ${decided.at.toISOString()} まで待って再開する（通算 ${decided.count} 回目）`);
+      log(await waitAndResume(decided));
+    }
   } catch (error) {
     log(`失敗: ${error.stack ?? error}`);
     process.exit(1);
