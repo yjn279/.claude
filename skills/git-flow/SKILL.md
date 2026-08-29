@@ -48,7 +48,7 @@ git commit --allow-empty -m "Initial commit"
 | 良い | `feat/add-search-filter` , `fix/login-redirect-loop` |
 | 悪い | `feature1` , `tmp` , `yuji-branch` , `20260509` |
 
-worktree はベースブランチ（既定 `origin/main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。
+worktree はベースブランチ（既定 `origin/main` ）の最新を起点に、リポジトリ配下の `.worktrees/` へ配置する。ディレクトリ名はブランチ名の `/` を `-` に変換した文字列とし、同名の worktree が既にあれば再利用する。現在の作業場所がすでに worktree であれば、新たな worktree は作らず、`git switch -c <type>/<description> origin/<base>` でその場に作業ブランチを切り出す。
 
 ```shell
 git fetch origin <base>
@@ -74,7 +74,7 @@ git pull --ff-only origin <base>
 
 ## Cleanup
 
-統合が終わった作業の残骸を削除するフェーズである。worktree とブランチを削除し、関連する GitHub Issue をクローズする。
+統合が終わった作業の残骸を削除するフェーズである。ブランチと、Start で作成した場合は worktree を削除し、関連する GitHub Issue をクローズする。
 
 ```shell
 cd "$(git rev-parse --git-common-dir)/.."
