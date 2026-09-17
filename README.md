@@ -12,6 +12,7 @@
 │   └── dependabot.yml          # サブモジュールの更新 Pull Request を毎週立てる
 ├── skills/                     # Skill 群
 ├── scripts/
+│   ├── auto-resume/            # 使用量の上限で止まった会話を、解除の時刻に自動で再開する
 │   └── fable-advice/           # 会話が要約されたあと Fable に問いかけを求めるフックの実行ファイル
 ├── CLAUDE.md                   # すべてのプロジェクトに共通する指示
 ├── settings.json               # フック・権限・利用するプラグインの宣言
@@ -38,6 +39,8 @@
 ## Runtime
 
 `/trinity:run` は実行するプロジェクトのルートに `.trinity/<run>/` を作り、worktree とログをそこへ置く。`~/.claude/` 配下には実行時の成果物を作らない。
+
+`scripts/auto-resume/` の記録だけは `~/.claude/resume-logs/` と `~/.claude/auto-resume/` に置く。いずれもバージョン管理しない。
 
 ## References
 
