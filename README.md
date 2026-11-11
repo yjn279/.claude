@@ -12,7 +12,8 @@
 │   └── dependabot.yml          # サブモジュールの更新 Pull Request を毎週立てる
 ├── skills/                     # Skill 群
 ├── scripts/
-│   └── fable-advice/           # 会話が要約されたあと Fable に問いかけを求めるフックの実行ファイル
+│   ├── fable-advice/           # 会話が要約されたあと Fable に問いかけを求めるフックの実行ファイル
+│   └── language-drift/         # 応答の言語のずれを見つけて言い直させるフックの実行ファイル
 ├── CLAUDE.md                   # すべてのプロジェクトに共通する指示
 ├── settings.json               # フック・権限・利用するプラグインの宣言
 └── README.md
