@@ -79,7 +79,7 @@ if (typeof verdict?.drifted !== "boolean" || typeof verdict.language !== "string
   fail(`Haiku の答えが決めた形に合わない: ${asked.stdout}`);
 }
 
-if (verdict.drifted) {
+if (verdict.drifted && verdict.language.toLowerCase() !== "none") {
   process.stdout.write(
     JSON.stringify({
       decision: "block",
