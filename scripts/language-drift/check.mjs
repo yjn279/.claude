@@ -1,18 +1,21 @@
 #!/usr/bin/env node
-// 応答の言語が、ユーザーの直近の発言の言語から意図せずずれていたら、Haiku で見つけて言い直させる。
-// 発言の言語を決めるのはユーザーの発言であり、応答だけを見て言語を判定しない。
+// 応答の言語が、ユーザーの発言が決める言語から意図せずずれていたら、Haiku で見つけて言い直させる。
+// どの発言が言語を決めるかは Haiku が判定する。応答だけを見て言語を判定しない。
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 const ROLE = `You check whether an AI assistant's reply is in the wrong language.
-You receive the user's latest message in <user_message> and the assistant's reply in <reply>.
+You receive the user's recent messages, oldest first, each inside <user_message>, and the assistant's reply in <reply>.
 
-Step 1. Decide the target language. First look for an explicit request about the reply's language anywhere in the user's message (for example "answer in English", "英語で書いて", "in Japanese please"). If there is one, the target is the requested language, even when the rest of the message is written in another language. Otherwise the target is the language the message is written in.
+Step 1. Decide the target language from the user's messages.
+- The newest message that has prose of its own decides the language. Messages without prose of their own do not decide it: short acknowledgements ("ok", "LGTM", "yes"), pasted logs or stack traces, URLs, file paths, and command arguments with no prose.
+- An explicit request about the reply's language (for example "answer in English", "以降は英語で答えて", "in Japanese please") sets the target to the requested language. It stays in force until a newer message is written in another language or makes a different request. A request inside a message wins over the language that message is written in.
 Example: the message "この関数を説明して。英語で書いて" asks for English, so the target is English and an English reply is not drifted.
+- If no message decides the language, set "language" to "none" and drifted to false.
 Step 2. Decide the language of the reply's prose. Ignore code, commands, identifiers, file paths, quotations, proper nouns and technical terms; technical terms in another language inside prose are normal.
 Step 3. drifted is true only if the reply's prose language differs from the target language. If the reply has little or no prose (code or commands only, or very short), drifted is false.
 
-Output only JSON: {"language": "<English name of the target language>", "reply_language": "<English name of the reply's prose language, or none>", "drifted": boolean}`;
+Output only JSON: {"language": "<English name of the target language, or none>", "reply_language": "<English name of the reply's prose language, or none>", "drifted": boolean}`;
 
 const fail = (message) => {
   process.stderr.write(`${message}\n`);
@@ -41,7 +44,8 @@ const bodyOf = (row) => {
   return NOT_PROSE.test(body) ? "" : body;
 };
 
-// 正しい言語を決める発言は、prompt_id に一致する最後の行までで、本文が空でない最後の発言。
+// Haiku に渡す発言は、prompt_id に一致する最後の行までで、本文が空でない最後の MAX_MESSAGES 件。
+const MAX_MESSAGES = 10;
 let rows;
 try {
   rows = fs.readFileSync(input.transcript_path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
@@ -50,14 +54,14 @@ try {
 }
 const current = rows.findLastIndex((r) => r.promptId === input.prompt_id);
 if (current < 0) fail(`prompt_id ${input.prompt_id} に一致する行が会話記録に無い`);
-const userMessage = rows.slice(0, current + 1).map(bodyOf).findLast(Boolean);
-if (!userMessage) process.exit(0);
+const userMessages = rows.slice(0, current + 1).map(bodyOf).filter(Boolean).slice(-MAX_MESSAGES);
+if (userMessages.length === 0) process.exit(0);
 
 const asked = spawnSync(
   "claude",
   ["--print", "--safe-mode", "--no-session-persistence", "--model", "haiku", "--system-prompt", ROLE],
   {
-    input: `<user_message>\n${userMessage}\n</user_message>\n<reply>\n${input.last_assistant_message}\n</reply>`,
+    input: `${userMessages.map((m) => `<user_message>\n${m}\n</user_message>`).join("\n")}\n<reply>\n${input.last_assistant_message}\n</reply>`,
     encoding: "utf8",
     timeout: 50_000,
     env: { ...process.env, CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" },
