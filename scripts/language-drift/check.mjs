@@ -30,8 +30,8 @@ if (input.stop_hook_active || !input.last_assistant_message) process.exit(0);
 // 発言の本文を返す。ユーザーが書いた地の文が無い行は空文字を返す。
 const NOT_PROSE = /^(<task-notification>|<ci-monitor-event>|<local-command-stdout>|\[Request interrupted|<bash-input>)/;
 const bodyOf = (row) => {
-  const { content } = row.message ?? {};
   if (row.type !== "user" || row.isMeta || row.isCompactSummary) return "";
+  const { content } = row.message ?? {};
   const text = Array.isArray(content)
     ? content.filter((b) => b.type === "text").map((b) => b.text).join("\n")
     : content;
@@ -42,15 +42,15 @@ const bodyOf = (row) => {
 };
 
 // 正しい言語を決める発言は、prompt_id に一致する最後の行までで、本文が空でない最後の発言。
-let userMessage;
+let rows;
 try {
-  const rows = fs.readFileSync(input.transcript_path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
-  const current = rows.findLastIndex((r) => r.promptId === input.prompt_id);
-  if (current < 0) fail(`prompt_id ${input.prompt_id} に一致する行が会話記録に無い`);
-  userMessage = rows.slice(0, current + 1).map(bodyOf).findLast(Boolean);
+  rows = fs.readFileSync(input.transcript_path, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line));
 } catch (e) {
   fail(`会話記録を読めない: ${e.message}`);
 }
+const current = rows.findLastIndex((r) => r.promptId === input.prompt_id);
+if (current < 0) fail(`prompt_id ${input.prompt_id} に一致する行が会話記録に無い`);
+const userMessage = rows.slice(0, current + 1).map(bodyOf).findLast(Boolean);
 if (!userMessage) process.exit(0);
 
 const asked = spawnSync(
