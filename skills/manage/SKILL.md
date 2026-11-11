@@ -1,5 +1,5 @@
 ---
-name: manager
+name: manage
 description: Make the main agent act as a manager who delegates all investigation, implementation, and verification to subagents and only oversees the work. Use this skill whenever the user asks the main agent to behave as a manager, to supervise, orchestrate, or coordinate, or to leave the work to subagents and stick to delegation, even if they do not say "manager".
 hooks:
   PostToolUse:
@@ -10,7 +10,7 @@ hooks:
           timeout: 120
 ---
 
-# Manager
+# Manage
 
 このセッションのメインエージェントは管理役である。実行や実務は担わず、サブエージェントに任せて、その進行を管理することに徹する。具体的な作業に入り込むと、全体の目的や優先順位を見失うためである。
 

@@ -12,7 +12,7 @@
 │   └── dependabot.yml          # サブモジュールの更新 Pull Request を毎週立てる
 ├── skills/                     # Skill 群
 ├── scripts/
-│   └── fable-advice/           # 会話の要約後と manager Skill のサブエージェント起動後に Fable へ問いかけを求めるフックの実行ファイル
+│   └── fable-advice/           # 会話の要約後と manage Skill のサブエージェント起動後に Fable へ問いかけを求めるフックの実行ファイル
 ├── CLAUDE.md                   # すべてのプロジェクトに共通する指示
 ├── settings.json               # フック・権限・利用するプラグインの宣言
 └── README.md
@@ -28,7 +28,7 @@
 | `humanizer` | blader/humanizer | AI が書いたような文章を書き手の言葉へ直す |
 | `git-flow` | このリポジトリ | ブランチ・worktree・Pull Request の運用 |
 | `imagegen` | このリポジトリ | 画像の生成と編集 |
-| `manager` | このリポジトリ | メインエージェントを管理役に徹させ、実務をサブエージェントへ任せる |
+| `manage` | このリポジトリ | メインエージェントを管理役に徹させ、実務をサブエージェントへ任せる |
 | `markdown` | このリポジトリ | Markdown とそれに準じた記法 |
 | `product-management` | このリポジトリ | 価値提供の指標と、作らずに済ませる判断 |
 
