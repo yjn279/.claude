@@ -25,7 +25,7 @@ try {
 } catch (e) {
   fail(`入力 JSON を読めない: ${e.message}`);
 }
-if (input.stop_hook_active) process.exit(0);
+if (input.stop_hook_active || !input.last_assistant_message) process.exit(0);
 
 // 人が書いた発言は、content が文字列で isMeta を持たない行。同じ prompt_id では最後のものを使う。
 let userMessage;
@@ -45,6 +45,7 @@ const asked = spawnSync(
   {
     input: `<user_message>\n${userMessage}\n</user_message>\n<reply>\n${input.last_assistant_message}\n</reply>`,
     encoding: "utf8",
+    timeout: 50_000,
     env: { ...process.env, CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" },
   },
 );
