@@ -21,16 +21,12 @@ const clip = (text) =>
 // メインエージェントの記録だけを、発言・ツール呼び出し・ツール結果の順に平らな文字列へ直す。
 function renderEntry({ type, message }) {
   const blocks = typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content;
-  const parts = blocks.flatMap((b) => {
-    if (b.type === "text") return [`${type}: ${b.text}`];
-    if (b.type === "tool_use") return [`${type} → ${b.name}: ${JSON.stringify(b.input)}`];
-    if (b.type === "tool_result") {
-      const body = typeof b.content === "string" ? b.content : JSON.stringify(b.content);
-      return [`result: ${body}`];
-    }
-    return [];
-  });
-  return parts.map(clip).join("\n");
+  const line = (b) => {
+    if (b.type === "text") return `${type}: ${b.text}`;
+    if (b.type === "tool_use") return `${type} → ${b.name}: ${JSON.stringify(b.input)}`;
+    if (b.type === "tool_result") return `result: ${typeof b.content === "string" ? b.content : JSON.stringify(b.content)}`;
+  };
+  return blocks.map(line).filter(Boolean).map(clip).join("\n");
 }
 
 function transcriptExcerpt(path) {
