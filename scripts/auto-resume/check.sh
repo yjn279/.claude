@@ -9,7 +9,6 @@ STATE="$CLAUDE_HOME/auto-resume/state.json"
 # 許可の要る場所を通ることまで含めて確かめるため、書類フォルダの下で試す。
 WORKDIR="$HOME/Documents/auto-resume-check"
 TMP="$(mktemp -d)"
-BUFFER=$(python3 -c "import json;print(json.load(open('$HERE/config.json'))['resetBufferMinutes'])")
 
 field() { python3 -c "import json;print(json.load(open('$1')).get('$2',{}).get('$3') or '')" 2>/dev/null; }
 
@@ -60,7 +59,7 @@ if [ -z "${WAITER}" ]; then
 fi
 echo "   ${SCHEDULED} まで待つ処理が生きている（番号 ${WAITER}）"
 
-echo "3. その時刻まで待つ（$((BUFFER + 1)) 分ほど）"
+echo "3. その時刻まで待つ（数分）"
 for _ in $(seq 1 120); do
   RESULT=$(field "$STATE" "$SESSION" result)
   [ -n "${RESULT}" ] && break

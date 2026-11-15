@@ -1,6 +1,0 @@
-{
-  "maxResumesPerSession": 3,
-  "resetBufferMinutes": 3,
-  "lateLimitMinutes": 720,
-  "resumePrompt": "上限で中断した作業の続きを進めよ。"
-}

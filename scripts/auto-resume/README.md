@@ -23,24 +23,23 @@
 
 ## Files
 
-仕組みは次の 3 つのファイルからなり、呼び出しの設定は `~/.claude/settings.json` の `hooks.StopFailure` にある。
+仕組みは次の 2 つのファイルからなり、呼び出しの設定は `~/.claude/settings.json` の `hooks.StopFailure` にある。
 
 | ファイル | 役割 |
 | :-- | :-- |
-| `config.json` | 各しきい値。変更するのはここだけでよい |
 | `detect.mjs` | 上限で止まったかを判定し、解除の時刻まで待ち、会話を再開する |
 | `check.sh` | 上限を待たずに、仕組み全体をその場で確かめる |
 
 ## Configuration
 
-しきい値は `config.json` にまとめてある。
+しきい値は `detect.mjs` の冒頭に定数としてまとめてあり、変更するのはそこだけでよい。
 
-| 項目 | 既定 | 意味 |
+| 定数 | 値 | 意味 |
 | :-- | :-- | :-- |
-| `maxResumesPerSession` | `3` | 同じ会話を再開する上限の回数。再開してすぐまた上限に当たる場合の空回りを防ぐ |
-| `resetBufferMinutes` | `3` | 解除の時刻に足す余裕 |
-| `lateLimitMinutes` | `720` | この分数を超えて遅れたら再開しない。長く触っていない端末が古い作業を突然動かすのを防ぐ |
-| `resumePrompt` | — | 再開したときに最初に渡す指示 |
+| `MAX_RESUMES_PER_SESSION` | `3` | 同じ会話を再開する上限の回数。再開してすぐまた上限に当たる場合の空回りを防ぐ |
+| `RESET_BUFFER_MINUTES` | `3` | 解除の時刻に足す余裕 |
+| `LATE_LIMIT_MINUTES` | `720` | この分数を超えて遅れたら再開しない。長く触っていない端末が古い作業を突然動かすのを防ぐ |
+| `RESUME_PROMPT` | — | 再開したときに最初に渡す指示 |
 
 仕組み全体を止めるには、 `~/.claude/settings.json` から `StopFailure` のフックを外す。一時的に止めるときは、環境変数 `CLAUDE_AUTO_RESUME` に `off` （ `0` ・ `false` も可）を入れて Claude Code を起動する。どちらの場合も、すでに待っている処理は止まらないため、 `~/.claude/auto-resume/state.json` で番号を調べて `kill <pid>` で終わらせる。
 

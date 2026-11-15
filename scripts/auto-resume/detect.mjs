@@ -6,8 +6,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-const HERE = import.meta.dirname;
-const CONFIG = JSON.parse(fs.readFileSync(path.join(HERE, "config.json"), "utf8"));
+// しきい値。変更するのはここだけでよい。
+const MAX_RESUMES_PER_SESSION = 3; // 再開してすぐまた上限に当たる場合の空回りを防ぐ
+const RESET_BUFFER_MINUTES = 3; // 解除の時刻に足す余裕
+const LATE_LIMIT_MINUTES = 720; // 長く触っていない端末が古い作業を突然動かすのを防ぐ
+const RESUME_PROMPT = "上限で中断した作業の続きを進めよ。";
+
 const CLAUDE_HOME = process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), ".claude");
 const STATE_FILE = path.join(CLAUDE_HOME, "auto-resume", "state.json");
 const LOG_DIR = path.join(CLAUDE_HOME, "resume-logs");
@@ -124,9 +128,9 @@ function decide(payload) {
   if (waiting?.pid && alive(waiting.pid)) return `${sessionId}: 同じ会話を既に待っている。何もしない`;
 
   const count = waiting?.count ?? 0;
-  if (count >= CONFIG.maxResumesPerSession) return `${sessionId}: 再開 ${count} 回に達した。諦める`;
+  if (count >= MAX_RESUMES_PER_SESSION) return `${sessionId}: 再開 ${count} 回に達した。諦める`;
 
-  const at = new Date(epoch + CONFIG.resetBufferMinutes * 60_000);
+  const at = new Date(epoch + RESET_BUFFER_MINUTES * 60_000);
   at.setSeconds(0, 0);
 
   updateState(sessionId, { count: count + 1, scheduledFor: at.toISOString(), cwd, transcript, pid: process.pid });
@@ -139,7 +143,7 @@ async function waitAndResume({ sessionId, cwd, transcript, at }) {
   while (Date.now() < at.getTime()) await sleep(Math.min(30_000, at.getTime() - Date.now()));
 
   const lateMinutes = Math.round((Date.now() - at.getTime()) / 60_000);
-  if (lateMinutes > CONFIG.lateLimitMinutes) {
+  if (lateMinutes > LATE_LIMIT_MINUTES) {
     updateState(sessionId, { pid: null, result: `${lateMinutes} 分の遅れで見送り` });
     return `${sessionId}: 予定より ${lateMinutes} 分遅れたため再開しない`;
   }
@@ -156,7 +160,7 @@ async function waitAndResume({ sessionId, cwd, transcript, at }) {
   const out = fs.openSync(logPath, "a");
 
   // 再開のあいだは端末を眠らせない。
-  const child = spawn("/usr/bin/caffeinate", ["-i", which("claude"), "--resume", sessionId, "--print", CONFIG.resumePrompt], {
+  const child = spawn("/usr/bin/caffeinate", ["-i", which("claude"), "--resume", sessionId, "--print", RESUME_PROMPT], {
     cwd, stdio: ["ignore", out, out],
   });
   const status = await new Promise((done) => child.on("exit", (code) => done(code ?? -1)));
