@@ -15,7 +15,7 @@
 │   ├── auto-resume/            # 使用量の上限で止まった会話を、解除の時刻に自動で再開するフックの実行ファイル
 │   ├── fable-advice/           # manage Skill でサブエージェントが報告を返した後に Fable へ問いかけを求めるフックの実行ファイル
 │   ├── language-drift/         # 応答の言語のずれを見つけて言い直させるフックの実行ファイル
-│   ├── report-gaps/            # 報告に欠けた前提・結論・根拠を見つけて言い直させるフックの実行ファイル
+│   ├── report-gaps/            # 報告に欠けた前提・結論を見つけて言い直させるフックの実行ファイル
 │   └── reply-verdict.mjs       # language-drift と report-gaps が使う、応答への判定を Haiku から受け取る処理
 ├── CLAUDE.md                   # すべてのプロジェクトに共通する指示
 ├── settings.json               # フック・権限・利用するプラグインの宣言

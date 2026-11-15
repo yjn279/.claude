@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// 報告に前提・結論・根拠のいずれかが欠けていたら、Haiku で見つけて言い直させる。
+// 報告に前提か結論が欠けていたら、Haiku で見つけて言い直させる。
 // 質問への回答、事実を確かめる問い返し、単純な操作の報告は対象にしない。
 import { block, replyVerdict } from "../reply-verdict.mjs";
 
@@ -7,8 +7,8 @@ import { block, replyVerdict } from "../reply-verdict.mjs";
 const POINTS = {
   premise:
     "the premise (what the user asked for, or which project or task this is; what the assistant did or changed is the conclusion, never the premise)",
-  conclusion: "the conclusion (the outcome, and whatever the user is asked to approve, decide or discuss)",
-  rationale: "the rationale (the reasons or evidence behind the conclusion and the decisions made)",
+  conclusion:
+    "the conclusion (the outcome, and the course of action or execution the assistant proposes next for the user to approve, when there is one)",
 };
 
 const ROLE = `You check whether an AI coding assistant's last message of a turn reports its work the way its user requires.
@@ -35,5 +35,5 @@ const verdict = replyVerdict(
 
 const missing = Object.keys(POINTS).filter((name) => !verdict[name].trim());
 if (verdict.kind === "full" && missing.length > 0) {
-  block(`Your previous reply is a report that leaves out ${missing.map((name) => POINTS[name]).join("; ")}. Restate the report so that it conveys every point it left out. Do not redo the work.`);
+  block(`Your previous reply is a report that leaves out ${missing.map((name) => POINTS[name]).join("; ")}. Restate the report as briefly as possible so that it conveys every point it left out. Do not redo the work.`);
 }
