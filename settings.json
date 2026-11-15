@@ -41,6 +41,7 @@
       }
     }
   },
+  "cleanupPeriodDays": 90,
   "effortLevel": "xhigh",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
