@@ -55,7 +55,10 @@ export function replyVerdict(role, maxMessages, isValid) {
       env: { ...process.env, CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" },
     },
   );
-  if (asked.status !== 0) fail(`Haiku の呼び出しに失敗した: ${asked.error?.message ?? asked.stderr}`);
+  // claude は失敗の理由を標準出力へ書くことがあるため、標準エラーとあわせて伝える。
+  if (asked.status !== 0) {
+    fail(`Haiku の呼び出しに失敗した（終了 ${asked.status ?? asked.signal}）: ${asked.error?.message ?? `${asked.stderr}${asked.stdout}`}`);
+  }
 
   let verdict;
   try {

@@ -70,7 +70,10 @@ const asked = spawnSync(
   },
 );
 
-if (asked.status !== 0) fail(`Fable の呼び出しに失敗した: ${asked.error?.message ?? asked.stderr}`);
+// claude は失敗の理由を標準出力へ書くことがあるため、標準エラーとあわせて伝える。
+if (asked.status !== 0) {
+  fail(`Fable の呼び出しに失敗した（終了 ${asked.status ?? asked.signal}）: ${asked.error?.message ?? `${asked.stderr}${asked.stdout}`}`);
+}
 
 const advice = asked.stdout.trim();
 process.stdout.write(
