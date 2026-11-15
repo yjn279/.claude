@@ -25,7 +25,6 @@
 
 | Skill | 取得元 | 役割 |
 | :-- | :-- | :-- |
-| `frontend-slides` | zarazhangrui/frontend-slides | ブラウザだけで動くスライドを作る |
 | `humanizer` | blader/humanizer | AI が書いたような文章を書き手の言葉へ直す |
 | `git-flow` | このリポジトリ | ブランチ・worktree・Pull Request の運用 |
 | `imagegen` | このリポジトリ | 画像の生成と編集 |
