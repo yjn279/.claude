@@ -1,11 +1,11 @@
 ---
 name: git-flow
-description: Skill for the full git lifecycle in this repo, from init through branch, worktree, PR, and cleanup.
+description: Git workflow for any repository, covering branch naming, worktrees, pull requests with squash merge, and cleanup. Use whenever you create a branch or worktree, commit, push, open or merge a pull request, or start a new repository.
 ---
 
 # Git Flow
 
-このリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、常にベースブランチの最新をチェックアウトしておく場所）では直接作業はしない。変更はすべて作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
+作業するリポジトリにおける git 運用の方針を定める。リポジトリの本体ディレクトリ（worktree ではなく、常にベースブランチの最新をチェックアウトしておく場所）では直接作業はしない。変更はすべて作業ブランチと worktree 上で進め、Pull Request 経由で統合する。これにより、レビューを必ず通し、履歴を機能・修正単位で残し、問題発生時に特定コミットへ戻せる状態を保つ。
 
 ライフサイクルは Initialization・Start・Integration・Cleanup の 4 フェーズからなる。全体像を以下に示す。
 
