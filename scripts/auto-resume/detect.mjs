@@ -15,7 +15,7 @@ const LOG_DIR = path.join(CLAUDE_HOME, "resume-logs");
 // 「You've hit your session limit · resets 9:10pm (Asia/Tokyo)」の形を読む。
 const LIMIT_RE = /hit your [^.\n]*limit/i;
 const RESET_RE = /resets\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)/i;
-const ZONE_RE = /\(([A-Za-z_]+\/[A-Za-z_+-]+|UTC)\)/;
+const ZONE_RE = /\(([A-Za-z_]+(?:\/[A-Za-z0-9_+-]+)+|UTC)\)/;
 
 function log(line) {
   fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -70,16 +70,8 @@ function resetEpoch(text, now) {
   if (matched[3].toLowerCase() === "pm") hour += 12;
   const minute = matched[2] ? +matched[2] : 0;
 
-  const zoneName = ZONE_RE.exec(text)?.[1];
-  let zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (zoneName) {
-    try {
-      zoneOffsetMs(zoneName, now);
-      zone = zoneName;
-    } catch {
-      // 未知の地域名のときは、この端末の地域として読む
-    }
-  }
+  // 地域名が書かれていなければ、この端末の地域として読む。知らない地域名は時刻の計算で失敗させる。
+  const zone = ZONE_RE.exec(text)?.[1] ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const today = zonedYmd(zone, now);
   let epoch = zonedEpoch(zone, today.y, today.m, today.d, hour, minute);
@@ -174,8 +166,8 @@ async function waitAndResume({ sessionId, cwd, transcript, at }) {
   return `${sessionId}: 再開して終了コード ${status}（出力は ${logPath}）`;
 }
 
-// 有効・無効の切り替え。設定ファイルか環境変数のどちらでも止められる。
-if (CONFIG.enabled !== true || /^(0|off|false)$/i.test(process.env.CLAUDE_AUTO_RESUME ?? "")) {
+// 環境変数で一時的に止められる。
+if (/^(0|off|false)$/i.test(process.env.CLAUDE_AUTO_RESUME ?? "")) {
   process.exit(0);
 }
 
