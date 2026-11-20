@@ -1,0 +1,5 @@
+{
+  "name": "idle-compact",
+  "version": "0.1.0",
+  "description": "Compacts the conversation once 90% of the prompt cache lifetime has passed since the last turn."
+}
