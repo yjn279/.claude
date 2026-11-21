@@ -275,7 +275,7 @@ a.card:hover .out { color: var(--link); }
   }
   const stopEase = () => layer.classList.remove('ease');
   const ease = () => layer.classList.add('ease');
-  layer.addEventListener('transitionend', stopEase);
+  layer.addEventListener('transitionend', e => { if (e.target === layer) stopEase(); });
 
   // 開閉や課題の表示で配置が変わっても、押したカードを画面上の同じ位置に留める
   function keepInPlace(el, change) {

@@ -29,8 +29,8 @@ def main():
     for mark in ('__TITLE__', '__DATA__'):
         if page.count(mark) != 1:
             raise SystemExit(f'雛形の差し込み口 {mark} は1つでなければならない（{page.count(mark)} 個ある）')
-    # </script> で埋め込みが途切れないよう、</ を JSON として同じ意味の <\/ に置き換える
-    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('</', '<\\/')
+    # </script> や <!-- で埋め込みが途切れないよう、< を JSON として同じ意味の \u003c に置き換える
+    payload = json.dumps(data, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
     page = page.replace('__TITLE__', html.escape(data['meta']['title'])).replace('__DATA__', payload)
 
     Path(out).write_text(page, encoding='utf-8')

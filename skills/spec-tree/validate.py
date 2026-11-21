@@ -59,7 +59,7 @@ def validate(d, repo):
     try:
         if git('rev-parse', f'{meta["commit"]}^{{commit}}').strip() != meta['sha']:
             errs.append('meta.sha が meta.commit のコミットと一致しない')
-        files = set(git('ls-tree', '-r', '--name-only', meta['sha']).splitlines())
+        files = set(git('ls-tree', '-r', '-z', '--name-only', meta['sha']).split('\0')) - {''}
     except subprocess.CalledProcessError:
         errs.append(f'コミット {meta["commit"]} が {repo} に無い')
         return errs, warns
