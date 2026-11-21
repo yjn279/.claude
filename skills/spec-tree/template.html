@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ja">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@500;700&display=swap">
+<style>
+/* 白地の1枚のキャンバス。左の目的から右の実装へ、目的 → 要求 → 機能 → 要件 → 仕様 → 実装 のカードを横向きのツリーに並べ、
+   ドラッグで動かし、ホイールとピンチで拡大縮小する。
+   白一色の明るいテーマに固定し、ダークテーマの切り替えは持たない。 */
+:root {
+  --bg: #ffffff;
+  --ink: #1f2430;
+  --ink-soft: #3a4152;
+  --muted: #646c7e;
+  --edge: #e3e6ee;
+  --edge-strong: #cdd3df;
+  --line: #c5cbd8;
+  --dot: #e9ecf2;
+  --link: #3451c7;
+  --shadow: rgb(31 36 48 / 0.10);
+  --on-ink: #ffffff;
+  --on-ink-soft: rgb(255 255 255 / 0.16);
+  --on-ink-muted: #aeb5c4;
+  --issue: #c92a2a;
+  --issue-soft: #fff0f0;
+  --c-need: #3451c7; --s-need: #edf1ff;
+  --c-feat: #6741d9; --s-feat: #f3f0ff;
+  --c-reqt: #0b7285; --s-reqt: #e3f7fa;
+  --c-spec: #9c5700; --s-spec: #fff3df;
+  --c-impl: #495057; --s-impl: #f1f3f5;
+  --font-display: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Hiragino Sans", system-ui, sans-serif;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --w: 300px; --w-root: 320px; --gap: 34px; --stub: 22px;
+  color-scheme: light;
+}
+@media (max-width: 560px) {
+  :root { --w: 208px; --w-root: 200px; --gap: 22px; --stub: 14px; }
+  .card[data-t="目的"] .tx { font-size: 15px; }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; background: var(--bg); color: var(--ink);
+  font: 14px/1.65 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
+
+/* タイトル。キャンバスの上に重ね、下へ向けて白く溶かす */
+.top {
+  position: fixed; z-index: 2; inset: 0 0 auto; pointer-events: none;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) max(20px, env(safe-area-inset-right, 0px)) 30px max(20px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(var(--bg) 65%, rgb(255 255 255 / 0));
+}
+.top h1 { margin: 0; font: 700 21px/1.3 var(--font-display); letter-spacing: 0.02em; font-feature-settings: "palt"; text-wrap: balance; }
+
+/* キャンバス */
+.vp {
+  position: fixed; inset: 0; overflow: hidden; touch-action: none; cursor: grab;
+  user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: rgb(255 255 255 / 0);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, var(--dot) 1.1px, rgb(255 255 255 / 0) 1.5px);
+  background-size: var(--gs, 24px) var(--gs, 24px);
+  background-position: var(--gx, 0px) var(--gy, 0px);
+}
+.vp.grabbing { cursor: grabbing; }
+.layer { position: absolute; left: 0; top: 0; width: max-content; transform-origin: 0 0; }
+.layer.ease { transition: transform 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { .layer.ease { transition: none; } }
+
+/* 横に伸びるツリー。連結線は角を丸めた疑似要素で描く */
+.br { display: flex; align-items: center; }
+.kids { position: relative; flex: none; display: flex; flex-direction: column; margin-left: var(--gap); }
+.kids::before { content: ""; position: absolute; top: 50%; left: calc(-1 * var(--gap)); width: var(--gap); border-top: 1.5px solid var(--line); }
+.kids > .br { position: relative; padding: 7px 0 7px var(--stub); }
+.kids > .br::before, .kids > .br::after { content: ""; position: absolute; left: 0; width: var(--stub); border: 0 solid var(--line); }
+.kids > .br::before { top: 0; bottom: 0; border-left-width: 1.5px; }
+.kids > .br::after { top: 50%; border-top-width: 1.5px; }
+.kids > .br:first-child::before { top: 50%; border-top-width: 1.5px; border-top-left-radius: 14px; }
+.kids > .br:last-child::before { bottom: 50%; border-bottom-width: 1.5px; border-bottom-left-radius: 14px; }
+.kids > .br:first-child::after, .kids > .br:last-child::after { display: none; }
+.kids > .br:only-child::before { display: none; }
+.kids > .br:only-child::after { display: block; }
+
+/* カード */
+[data-t="目的"] { --c: var(--ink); --s: var(--on-ink-soft); }
+[data-t="要求"] { --c: var(--c-need); --s: var(--s-need); }
+[data-t="機能"] { --c: var(--c-feat); --s: var(--s-feat); }
+[data-t="要件"] { --c: var(--c-reqt); --s: var(--s-reqt); }
+[data-t="仕様"] { --c: var(--c-spec); --s: var(--s-spec); }
+[data-t="実装"] { --c: var(--c-impl); --s: var(--s-impl); }
+.card {
+  position: relative; flex: none; width: var(--w);
+  display: flex; flex-direction: column; gap: 7px; padding: 12px 14px 13px;
+  background: var(--bg); color: var(--ink); text-decoration: none;
+  border: 1px solid var(--edge); border-radius: 14px;
+  box-shadow: 0 1px 2px var(--shadow), 0 8px 20px -12px var(--shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.card.can { cursor: pointer; }
+.card.can:hover, a.card:hover { border-color: var(--edge-strong); box-shadow: 0 1px 2px var(--shadow), 0 12px 26px -12px var(--shadow); }
+.card.guess { border: 1.5px dashed var(--edge-strong); }
+.hd { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+.chip {
+  padding: 3px 9px 2px; border-radius: 999px; background: var(--s); color: var(--c);
+  font: 700 11.5px/1.4 var(--font-display); letter-spacing: 0.1em;
+}
+.tx > .chip, .tx > .pv { display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.pv { padding: 0 7px; border: 1px dashed var(--edge-strong); border-radius: 999px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.kind { color: var(--muted); font-size: 11.5px; }
+.tx { margin: 0; overflow-wrap: anywhere; }
+.card[data-t="要求"] .tx { font-weight: 500; }
+
+/* 根のカード */
+.card[data-t="目的"] { width: var(--w-root); gap: 10px; padding: 18px 20px; background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.card[data-t="目的"] .chip { color: var(--on-ink); }
+.card[data-t="目的"] .tx { font: 500 16px/1.75 var(--font-display); font-feature-settings: "palt"; }
+.src { align-self: flex-start; color: var(--on-ink-muted); font: 11.5px/1.5 var(--font-mono); text-decoration: none; }
+.src:hover { color: var(--on-ink); text-decoration: underline; }
+
+/* 開閉のつまみ */
+.knob {
+  position: absolute; z-index: 1; top: 50%; right: -13px; translate: 0 -50%;
+  width: 26px; height: 26px; padding: 0; display: grid; place-items: center;
+  border: 1.5px solid var(--c); border-radius: 50%; background: var(--bg); color: var(--c);
+  font: 700 11px/1 var(--font-body); font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.knob[aria-expanded="true"] { background: var(--c); color: var(--bg); font-size: 14px; }
+.card[data-t="目的"] .knob[aria-expanded="true"] { border-color: var(--bg); }
+
+/* 仕様の検証の状態と課題 */
+.ft { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.st { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11.5px; cursor: help; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--muted); }
+.st[data-st="platform"]::before { background: var(--muted); }
+.st[data-st="manual"]::before { background: linear-gradient(90deg, var(--muted) 50%, rgb(255 255 255 / 0) 50%); }
+.gapbtn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 9px 3px 10px; border: 0; border-radius: 999px; background: var(--issue-soft); color: var(--issue);
+  font: 700 11.5px/1.4 var(--font-display); cursor: pointer;
+}
+.gapbtn::after { content: ""; width: 5px; height: 5px; margin-top: -3px; border: solid currentColor; border-width: 0 1.5px 1.5px 0; rotate: 45deg; transition: rotate 0.15s, margin 0.15s; }
+.gapbtn[aria-expanded="true"]::after { rotate: -135deg; margin-top: 2px; }
+.gaps { display: flex; flex-direction: column; gap: 12px; padding-top: 10px; border-top: 1px dashed var(--edge-strong); cursor: default; }
+.gap p { margin: 3px 0 0; font-size: 12.5px; line-height: 1.65; overflow-wrap: anywhere; }
+.gap b { color: var(--issue); font: 700 12px/1.4 var(--font-display); }
+.gpv { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.gap .refs { color: var(--muted); font: 11px/1.6 var(--font-mono); }
+
+/* 実装 */
+.loc { color: var(--ink); font: 500 12px/1.5 var(--font-mono); overflow-wrap: anywhere; }
+.q { color: var(--ink-soft); font-size: 13px; }
+.out { width: 12px; height: 12px; margin-left: auto; color: var(--muted); flex: none; }
+a.card { -webkit-user-drag: none; }
+a.card:hover { border-color: var(--link); }
+a.card:hover .loc { color: var(--link); text-decoration: underline; text-underline-offset: 2px; }
+a.card:hover .out { color: var(--link); }
+.card.none { background: var(--s-impl); border-color: var(--s-impl); box-shadow: none; }
+.card.none .tx { color: var(--muted); font-size: 13px; }
+
+/* 拡大・縮小・全体表示 */
+.zoom {
+  position: fixed; z-index: 3; display: flex; gap: 2px; padding: 4px;
+  right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg); border: 1px solid var(--edge); border-radius: 999px;
+  box-shadow: 0 1px 2px var(--shadow), 0 10px 24px -12px var(--shadow);
+}
+.zoom button {
+  min-width: 38px; height: 38px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--bg);
+  font: 700 13px/1 var(--font-display); cursor: pointer;
+}
+.zoom button:hover { background: var(--s-impl); }
+.zoom svg { width: 14px; height: 14px; display: block; }
+.zoom button[data-z="in"], .zoom button[data-z="out"] { padding: 0; display: grid; place-items: center; }
+</style>
+
+<div class="vp" id="vp"><div class="layer" id="layer"><div id="tree"></div></div></div>
+<header class="top"><h1 id="title"></h1></header>
+<div class="zoom" role="group" aria-label="表示の大きさ">
+  <button type="button" data-z="out" aria-label="縮小"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></button>
+  <button type="button" data-z="in" aria-label="拡大"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2.5 7h9M7 2.5v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg></button>
+  <button type="button" data-z="fit">全体</button>
+</div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById('data').textContent);
+  const { repo, sha, commit, status: ST } = D.meta;
+  const vp = document.getElementById('vp'), layer = document.getElementById('layer'), tree = document.getElementById('tree');
+  const title = document.getElementById('title');
+  title.textContent = D.meta.title;
+
+  // ---- データからツリーを組む ----
+  const kids = new Map(D.nodes.map(n => [n.id, []]));
+  let root = null;
+  for (const n of D.nodes) n.p === null ? (root = n) : kids.get(n.p).push(n);
+  if (!root) throw new Error('根の節（p が null）が無い');
+
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const arrow = '<svg class="out" viewBox="0 0 12 12" aria-hidden="true"><path d="M4.5 2.5h5v5M9.5 2.5 2.5 9.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const EXT = '（外部）';
+
+  function implCard(n) {
+    if (!n.f) return `<div class="card none" data-t="実装"><div class="hd"><span class="chip">実装</span></div><p class="tx">${esc(n.n)}</p></div>`;
+    const loc = n.f.startsWith(EXT) ? n.f.slice(EXT.length) : `${n.f}:${n.l}`;
+    const body = `<div class="hd"><span class="chip">実装</span><span class="kind">${esc(n.k)}</span>${n.url ? arrow : ''}</div>`
+      + `<code class="loc">${esc(loc)}</code><p class="tx q">${esc(n.q)}</p>`;
+    return n.url
+      ? `<a class="card impl" data-t="実装" href="${esc(n.url)}" target="_blank" rel="noopener" draggable="false">${body}</a>`
+      : `<div class="card impl" data-t="実装">${body}</div>`;
+  }
+
+  function card(n) {
+    if (n.t === '実装') return implCard(n);
+    const ks = kids.get(n.id), gaps = n.gaps || [], guess = n.pv === '推定';
+    const st = n.st ? `<span class="st" data-st="${n.st}" title="${esc(n.how || ST[n.st].desc)}">${esc(ST[n.st].label)}</span>` : '';
+    const gapBtn = gaps.length ? `<button type="button" class="gapbtn" aria-expanded="false">課題 ${gaps.length}</button>` : '';
+    const gapList = gaps.length ? `<div class="gaps" hidden>${gaps.map(g => `<div class="gap"><b>${esc(g.ty)}</b>${g.pv === '推定' ? '<span class="gpv">推定</span>' : ''}`
+      + `<p>${esc(g.tx)}</p>${g.refs ? `<p class="refs">${g.refs.map(esc).join(' · ')}</p>` : ''}</div>`).join('')}</div>` : '';
+    const src = n === root ? `<a class="src" href="https://github.com/${esc(repo)}/tree/${esc(sha)}" target="_blank" rel="noopener" draggable="false">${esc(repo)} @ ${esc(commit)}</a>` : '';
+    const knob = ks.length ? `<button type="button" class="knob" data-n="${ks.length}" aria-expanded="false" aria-label="下の ${ks.length} 件を開く">${ks.length}</button>` : '';
+    return `<div class="card${ks.length ? ' can' : ''}${guess ? ' guess' : ''}" data-t="${esc(n.t)}">`
+      + `<p class="tx"><span class="chip">${esc(n.t)}</span>${guess ? '<span class="pv">推定</span>' : ''}${esc(n.n)}</p>${st || gapBtn ? `<div class="ft">${st}${gapBtn}</div>` : ''}${gapList}${src}${knob}</div>`;
+  }
+
+  const branch = n => `<div class="br">${card(n)}${kids.get(n.id).length ? `<div class="kids" hidden>${kids.get(n.id).map(branch).join('')}</div>` : ''}</div>`;
+  tree.innerHTML = branch(root);
+
+  function setOpen(cardEl, open) {
+    const knob = cardEl.querySelector(':scope > .knob'), n = knob.dataset.n;
+    cardEl.nextElementSibling.hidden = !open;
+    knob.setAttribute('aria-expanded', open);
+    knob.setAttribute('aria-label', open ? '閉じる' : `下の ${n} 件を開く`);
+    knob.textContent = open ? '−' : n;
+  }
+  setOpen(tree.querySelector('.card'), true);
+
+  // ---- 表示の位置と倍率 ----
+  const view = { x: 0, y: 0, s: 1 }, MIN = 0.15, MAX = 2.5;
+  const clamp = s => Math.min(MAX, Math.max(MIN, s));
+  function apply() {
+    layer.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+    let g = 24 * view.s;
+    while (g < 12) g *= 2;
+    vp.style.setProperty('--gs', `${g}px`);
+    vp.style.setProperty('--gx', `${view.x}px`);
+    vp.style.setProperty('--gy', `${view.y}px`);
+  }
+  function zoomAt(px, py, s) {
+    s = clamp(s);
+    view.x = px - (px - view.x) * s / view.s;
+    view.y = py - (py - view.y) * s / view.s;
+    view.s = s;
+    apply();
+  }
+  const titleBottom = () => title.getBoundingClientRect().bottom + 12;
+  function fit(minScale) {
+    const pad = vp.clientWidth < 560 ? 16 : 24, top = titleBottom();
+    const aw = vp.clientWidth - pad * 2, ah = vp.clientHeight - top - pad;
+    const w = layer.offsetWidth, h = layer.offsetHeight;
+    view.s = clamp(Math.max(minScale, Math.min(1, aw / w, ah / h)));
+    // 収まれば中央に置き、収まらなければ左上から読み始められるように寄せる
+    view.x = pad + Math.max(0, (aw - w * view.s) / 2);
+    view.y = top + Math.max(0, (ah - h * view.s) / 2);
+    apply();
+  }
+  const stopEase = () => layer.classList.remove('ease');
+  const ease = () => layer.classList.add('ease');
+  layer.addEventListener('transitionend', stopEase);
+
+  // 開閉や課題の表示で配置が変わっても、押したカードを画面上の同じ位置に留める
+  function keepInPlace(el, change) {
+    stopEase();
+    const a = el.getBoundingClientRect();
+    change();
+    const b = el.getBoundingClientRect();
+    view.x -= b.left - a.left;
+    view.y -= b.top - a.top;
+    apply();
+  }
+
+  // ---- ドラッグでの移動とピンチでの拡大縮小 ----
+  const pts = new Map();
+  let base = null, start = null, moved = false, touched = false;
+  function rebase() {
+    const p = [...pts.values()];
+    if (!p.length) { base = null; return; }
+    const c = p.length > 1 ? { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 } : p[0];
+    base = { c: { ...c }, d: p.length > 1 ? Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) : 0, x: view.x, y: view.y, s: view.s };
+  }
+  vp.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    touched = true;
+    if (!pts.size) { moved = false; start = { x: e.clientX, y: e.clientY }; }
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size > 1) moved = true;
+    stopEase();
+    rebase();
+  });
+  vp.addEventListener('pointermove', e => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!moved) {
+      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) < 5) return;
+      moved = true;
+    }
+    if (!vp.hasPointerCapture(e.pointerId)) vp.setPointerCapture(e.pointerId);
+    vp.classList.add('grabbing');
+    const p = [...pts.values()];
+    if (p.length === 1) {
+      view.x = base.x + p[0].x - base.c.x;
+      view.y = base.y + p[0].y - base.c.y;
+    } else {
+      const c = { x: (p[0].x + p[1].x) / 2, y: (p[0].y + p[1].y) / 2 };
+      const s = clamp(base.s * Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) / base.d);
+      view.x = c.x - (base.c.x - base.x) * s / base.s;
+      view.y = c.y - (base.c.y - base.y) * s / base.s;
+      view.s = s;
+    }
+    apply();
+  });
+  const release = e => {
+    if (!pts.delete(e.pointerId)) return;
+    rebase();
+    if (!pts.size) vp.classList.remove('grabbing');
+  };
+  vp.addEventListener('pointerup', release);
+  vp.addEventListener('pointercancel', release);
+  vp.addEventListener('dragstart', e => e.preventDefault());
+  // ドラッグの後のクリックは、カードの開閉やリンクとして扱わない。キーを押したら、その後のクリックは通常どおり扱う
+  vp.addEventListener('keydown', () => { moved = false; });
+  vp.addEventListener('click', e => {
+    if (!moved) return;
+    e.preventDefault();
+    e.stopPropagation();
+    moved = false;
+  }, true);
+
+  vp.addEventListener('wheel', e => {
+    e.preventDefault();
+    touched = true;
+    stopEase();
+    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+    zoomAt(e.clientX, e.clientY, view.s * Math.exp(-dy * (e.ctrlKey ? 0.01 : 0.0015)));
+  }, { passive: false });
+  // Safari のトラックパッドのピンチ。指でのピンチはポインターの側で扱う
+  let gestureScale = 1;
+  vp.addEventListener('gesturestart', e => { e.preventDefault(); gestureScale = view.s; });
+  vp.addEventListener('gesturechange', e => {
+    e.preventDefault();
+    if (!pts.size) zoomAt(e.clientX, e.clientY, gestureScale * e.scale);
+  });
+
+  // キーボードで移った先がキャンバスの外なら、見える所まで動かす
+  vp.addEventListener('scroll', () => {
+    view.x -= vp.scrollLeft;
+    view.y -= vp.scrollTop;
+    vp.scrollLeft = vp.scrollTop = 0;
+    apply();
+  });
+  vp.addEventListener('focusin', e => requestAnimationFrame(() => {
+    if (!e.target.matches(':focus-visible')) return;
+    const r = e.target.getBoundingClientRect(), m = 24, top = titleBottom(), bottom = innerHeight - 72;
+    const dx = r.left < m ? m - r.left : r.right > innerWidth - m ? innerWidth - m - r.right : 0;
+    const dy = r.top < top ? top - r.top : r.bottom > bottom ? bottom - r.bottom : 0;
+    if (dx || dy) { view.x += dx; view.y += dy; apply(); }
+  }));
+
+  // ---- 開閉と課題 ----
+  tree.addEventListener('click', e => {
+    const gapBtn = e.target.closest('.gapbtn');
+    if (gapBtn) {
+      const list = gapBtn.closest('.card').querySelector(':scope > .gaps');
+      keepInPlace(gapBtn.closest('.card'), () => {
+        list.hidden = !list.hidden;
+        gapBtn.setAttribute('aria-expanded', !list.hidden);
+      });
+      return;
+    }
+    if (e.target.closest('a, .gaps')) return;
+    const c = e.target.closest('.card.can');
+    if (c) keepInPlace(c, () => setOpen(c, c.nextElementSibling.hidden));
+  });
+
+  document.querySelector('.zoom').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    touched = true;
+    ease();
+    if (b.dataset.z === 'fit') fit(MIN);
+    else zoomAt(vp.clientWidth / 2, vp.clientHeight / 2, view.s * (b.dataset.z === 'in' ? 1.25 : 0.8));
+  });
+
+  // 最初は根と要求が読める大きさで見せる。書体が届いたら、まだ触れられていなければ合わせ直す
+  fit(0.8);
+  if (document.fonts) document.fonts.ready.then(() => { if (!touched) fit(0.8); });
+})();
+</script>
