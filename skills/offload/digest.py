@@ -22,14 +22,15 @@ PROJECTS = CLAUDE / "projects"
 HOME = str(Path.home())
 
 # Text that Claude Code, a hook or another session puts into a user turn. None of it is a request.
+INTERRUPTED = "interrupted by the user"
 INJECTED = (
-    ("Stop hook feedback:", None),
+    ("Stop hook feedback:", lambda rest: "Stop hook: " + clip(rest, 70)),
     ("Another Claude session sent a message:", "message from another session"),
     ("<task-notification>", "background task notification"),
     ("<system-reminder>", "system reminder"),
-    ("Base directory for this skill:", None),
+    ("Base directory for this skill:", lambda rest: "skill loaded: " + rest.split("\n", 1)[0].strip().rstrip("/").rsplit("/", 1)[-1]),
     ("This session is being continued", "summary after compaction"),
-    ("[Request interrupted", "interrupted by the user"),
+    ("[Request interrupted", INTERRUPTED),
     ("<local-command-", "local command output"),
     ("Caveat:", "local command output"),
     ("[Cross-session idle notice]", "idle notice from another session"),
@@ -39,7 +40,6 @@ INJECTED_TURNS = {"task_notification", "system"}
 COMMAND_RE = re.compile(r"<command-name>/?([^<]+)</command-name>")
 ARGS_RE = re.compile(r"<command-args>(.*?)</command-args>", re.S)
 SCHEDULED_RE = re.compile(r'<scheduled-task name="([^"]+)"')
-USAGE_KEYS = ("input", "cache_write_5m", "cache_write_1h", "cache_read", "output", "messages")
 # Commands whose second word says what they do.
 SUBCOMMAND_TOOLS = {
     "git", "gh", "npm", "npx", "pnpm", "yarn", "bun", "uv", "cargo", "docker", "brew", "orca",
@@ -76,11 +76,7 @@ def text_of(content):
 def injected_label(text):
     for prefix, label in INJECTED:
         if text.startswith(prefix):
-            if prefix == "Stop hook feedback:":
-                return "Stop hook: " + clip(text[len(prefix):], 70)
-            if prefix == "Base directory for this skill:":
-                return "skill loaded: " + text[len(prefix):].split("\n", 1)[0].strip().rstrip("/").rsplit("/", 1)[-1]
-            return label
+            return label(text[len(prefix):]) if callable(label) else label
     return None
 
 
@@ -149,6 +145,11 @@ def usage_parts(msg):
         yield (it.get("model") or "?") if advisor else model, advisor, counts
 
 
+def subagent_meta(p):
+    path = p.with_suffix(".meta.json")
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def records(path):
     """Yield user and assistant records. Stop on any line that cannot be parsed."""
     with open(path, encoding="utf-8") as f:
@@ -193,6 +194,10 @@ class Session:
     @property
     def first_text(self):
         return self.first[1] if self.first else ""
+
+    @property
+    def group_key(self):
+        return clip(self.first_text, 80)
 
     def output(self):
         return sum(u["output"] for u in self.usage.values())
@@ -239,7 +244,7 @@ class Digest:
                     s.commands[command] += 1
                 if kind == "injected":
                     self.injected[text] += 1
-                    s.interrupts += text == "interrupted by the user"
+                    s.interrupts += text == INTERRUPTED
                 elif kind:
                     s.prompts.append((kind, text))
                 continue
@@ -290,8 +295,8 @@ class Digest:
             models = self.read(p, s, "sub")
             if not models:
                 continue
-            meta = json.loads(p.with_suffix(".meta.json").read_text()) if p.with_suffix(".meta.json").exists() else {}
-            a = self.agents[(meta.get("agentType", "?"), models.most_common(1)[0][0])]
+            meta = subagent_meta(p)
+            a =self.agents[(meta.get("agentType", "?"), models.most_common(1)[0][0])]
             a["runs"] += 1
             a["out"] += s.output() - before
             if len(a["tasks"]) < 4 and meta.get("description"):
@@ -317,8 +322,8 @@ def variant_keys(texts):
 
 def report(d, days, top):
     sessions = list(d.sessions.values())
-    first_count = collections.Counter(clip(s.first_text, 80) for s in sessions if s.first)
-    routine = lambda s: s.kind == "scheduled" or (s.kind == "relayed" and first_count[clip(s.first_text, 80)] >= 2)
+    first_count = collections.Counter(s.group_key for s in sessions if s.first)
+    routine = lambda s: s.kind == "scheduled" or (s.kind == "relayed" and first_count[s.group_key] >= 2)
     out = []
     w = out.append
 
@@ -372,7 +377,7 @@ def report(d, days, top):
     groups = collections.defaultdict(list)
     for s in sessions:
         if routine(s):
-            groups[clip(s.first_text, 80)].append(s)
+            groups[s.group_key].append(s)
     ranked = sorted(groups.values(), key=lambda g: -sum(s.output() for s in g))[:top]
     for g in ranked:
         out_sum = sum(s.output() for s in g)
@@ -524,7 +529,7 @@ def dump(target, width):
     if subs:
         print("\n## Subagent runs\n")
         for p in subs:
-            meta = json.loads(p.with_suffix(".meta.json").read_text()) if p.with_suffix(".meta.json").exists() else {}
+            meta = subagent_meta(p)
             print(f"- {short_path(str(p))}: {meta.get('agentType', '?')}, {meta.get('description', '')}")
 
 
