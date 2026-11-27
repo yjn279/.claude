@@ -296,7 +296,7 @@ class Digest:
             if not turns_by_model:
                 continue
             meta = subagent_meta(p)
-            a =self.agents[(meta.get("agentType", "?"), turns_by_model.most_common(1)[0][0])]
+            a = self.agents[(meta.get("agentType", "?"), turns_by_model.most_common(1)[0][0])]
             a["runs"] += 1
             a["out"] += s.output() - before
             if len(a["tasks"]) < 4 and meta.get("description"):
