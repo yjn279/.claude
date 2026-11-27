@@ -80,8 +80,8 @@ def injected_label(text):
     return None
 
 
-def request(rec):
-    """Return (kind, text, command) for a user record. kind is human, relayed, scheduled, injected or None."""
+def classify_user_record(rec):
+    """Return (kind, text, command) for a user record. kind is human, relayed, scheduled, injected or None (a tool result)."""
     content = (rec.get("message") or {}).get("content")
     if isinstance(content, list) and any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
         return None, "", None
@@ -177,11 +177,11 @@ class Session:
         self.first = None  # (kind, text) of the first request, even if it came before the window
         self.prompts = []  # (kind, text) of requests inside the window
         self.commands = collections.Counter()
-        self.labels = []  # tool labels of the main agent, in order
-        self.tools = collections.Counter()
+        self.main_labels = []  # tool labels of the main agent's calls, in order; feeds the tool sequences table
+        self.tool_counts = collections.Counter()  # tool label -> calls by the main agent and its subagents
         self.usage = collections.defaultdict(collections.Counter)  # (model, role) -> counts
         self.interrupts = 0
-        self.active = False
+        self.has_records_in_window = False
 
     @property
     def kind(self):
@@ -216,15 +216,15 @@ class Digest:
         self.skills = collections.Counter()
         self.injected = collections.Counter()
         self.agents = collections.defaultdict(lambda: {"runs": 0, "out": 0, "tasks": []})
-        self.seen = set()
-        self.pending = {}
+        self.counted_message_ids = set()  # assistant messages whose usage is already counted
+        self.label_by_tool_id = {}  # id of every tool call -> its tool label, to attribute errors in results
 
     def session(self, sid):
         return self.sessions.setdefault(sid, Session(sid))
 
     def read(self, path, s, role):
-        """Fold one transcript into session s. Return the models its assistant turns used in the window."""
-        models = collections.Counter()
+        """Fold one transcript into session s. Return how many assistant turns in the window used each model."""
+        turns_by_model = collections.Counter()
         for rec in records(path):
             inside = (stamp(rec) or self.cutoff) >= self.cutoff
             s.cwd = s.cwd or rec.get("cwd")
@@ -234,12 +234,12 @@ class Digest:
                     self.tool_errors(rec)
                 if role == "sub":
                     continue
-                kind, text, command = request(rec)
+                kind, text, command = classify_user_record(rec)
                 if kind in ("human", "relayed", "scheduled") and s.first is None:
                     s.first = (kind, text)
                 if not inside:
                     continue
-                s.active = True
+                s.has_records_in_window = True
                 if command:
                     s.commands[command] += 1
                 if kind == "injected":
@@ -251,33 +251,33 @@ class Digest:
             msg = rec.get("message") or {}
             if not inside or msg.get("model") == "<synthetic>":
                 continue
-            s.active = True
-            models[msg.get("model") or "?"] += 1
-            if msg.get("usage") and msg.get("id") not in self.seen:
-                self.seen.add(msg.get("id"))
+            s.has_records_in_window = True
+            turns_by_model[msg.get("model") or "?"] += 1
+            if msg.get("usage") and msg.get("id") not in self.counted_message_ids:
+                self.counted_message_ids.add(msg.get("id"))
                 for model, advisor, counts in usage_parts(msg):
                     s.usage[(model, f"advisor of {role}" if advisor else role)].update(counts)
             for b in msg.get("content") if isinstance(msg.get("content"), list) else []:
                 if isinstance(b, dict) and b.get("type") == "tool_use":
                     self.tool_use(b, s, role)
-        return models
+        return turns_by_model
 
     def tool_errors(self, rec):
         content = (rec.get("message") or {}).get("content")
         for b in content if isinstance(content, list) else []:
-            if isinstance(b, dict) and b.get("is_error") and b.get("tool_use_id") in self.pending:
-                self.tools[self.pending[b["tool_use_id"]]]["errors"] += 1
+            if isinstance(b, dict) and b.get("is_error") and b.get("tool_use_id") in self.label_by_tool_id:
+                self.tools[self.label_by_tool_id[b["tool_use_id"]]]["errors"] += 1
 
     def tool_use(self, b, s, role):
         label = tool_label(b.get("name", "?"), b.get("input"))
-        self.pending[b.get("id")] = label
+        self.label_by_tool_id[b.get("id")] = label
         t = self.tools[label]
         t["calls"] += 1
         t["sessions"].add(s.sid)
         t["roles"][role] += 1
-        s.tools[label] += 1
+        s.tool_counts[label] += 1
         if role == "main":
-            s.labels.append(label)
+            s.main_labels.append(label)
         if b.get("name") == "Bash":
             self.bash[clip(b["input"].get("command", ""), 120)].add(s.sid)
         if b.get("name") == "Skill":
@@ -292,16 +292,16 @@ class Digest:
                 continue
             s = self.session(p.parent.parent.name)
             before = s.output()
-            models = self.read(p, s, "sub")
-            if not models:
+            turns_by_model = self.read(p, s, "sub")
+            if not turns_by_model:
                 continue
             meta = subagent_meta(p)
-            a =self.agents[(meta.get("agentType", "?"), models.most_common(1)[0][0])]
+            a =self.agents[(meta.get("agentType", "?"), turns_by_model.most_common(1)[0][0])]
             a["runs"] += 1
             a["out"] += s.output() - before
             if len(a["tasks"]) < 4 and meta.get("description"):
                 a["tasks"].append(meta["description"])
-        self.sessions = {k: s for k, s in self.sessions.items() if s.active}
+        self.sessions = {k: s for k, s in self.sessions.items() if s.has_records_in_window}
 
 
 def variant_keys(texts):
@@ -367,8 +367,8 @@ def report(d, days, top):
     w("| start | id | kind | project | prompts | commands | output tokens | first request |\n| :-- | :-- | :-- | :-- | --: | :-- | --: | :-- |")
     oneoff = sorted((s for s in sessions if s.first and not routine(s)), key=lambda s: s.start or "", reverse=True)
     for s in oneoff[: top * 2]:
-        cmds = ", ".join(f"/{c}" for c in s.commands)
-        w(f"| {(s.start or '')[:16]} | {s.sid[:8]} | {s.kind} | {project(s.cwd)} | {len(s.prompts)} | {cmds} | {s.output():,} "
+        command_list = ", ".join(f"/{c}" for c in s.commands)
+        w(f"| {(s.start or '')[:16]} | {s.sid[:8]} | {s.kind} | {project(s.cwd)} | {len(s.prompts)} | {command_list} | {s.output():,} "
           f"| {clip(s.first_text, 150)} |")
 
     w("\n## Routine session groups\n\nScheduled sessions, and relayed sessions whose first prompt two or more sessions share, grouped by "
@@ -382,7 +382,7 @@ def report(d, days, top):
     for g in ranked:
         out_sum = sum(s.output() for s in g)
         models = collections.Counter(m for s in g for m in s.main_models())
-        tools = sum((s.tools for s in g), collections.Counter())
+        tools = sum((s.tool_counts for s in g), collections.Counter())
         w(f"| {len(g)} | {', '.join(m for m, _ in models.most_common(2))} | {out_sum:,} | {out_sum // len(g):,} "
           f"| {', '.join(t for t, _ in tools.most_common(3))} | {clip(g[0].first_text, 110)} |")
     for g in ranked:
@@ -410,33 +410,33 @@ def report(d, days, top):
             f["sessions"].add(s.sid)
             f["times"] += 1
             f["kinds"][kind] += 1
-    rows = sorted(((k, f) for k, f in follow.items() if len(f["sessions"]) >= 2), key=lambda x: -len(x[1]["sessions"]))
-    for text, f in rows[:top]:
+    repeated_prompts = sorted(((k, f) for k, f in follow.items() if len(f["sessions"]) >= 2), key=lambda x: -len(x[1]["sessions"]))
+    for text, f in repeated_prompts[:top]:
         w(f"| {len(f['sessions'])} | {f['times']} | {'/'.join(f['kinds'])} | {text} |")
-    if not rows:
+    if not repeated_prompts:
         w("| 0 | 0 | | (none) |")
 
     w("\n## Slash commands and skills\n\n| name | slash command | Skill tool |\n| :-- | --: | --: |")
-    cmds = sum((s.commands for s in sessions), collections.Counter())
-    for name in sorted(set(cmds) | set(d.skills), key=lambda n: -(cmds[n] + d.skills[n]))[:top]:
-        w(f"| {name} | {cmds[name]} | {d.skills[name]} |")
+    command_counts = sum((s.commands for s in sessions), collections.Counter())
+    for name in sorted(set(command_counts) | set(d.skills), key=lambda n: -(command_counts[n] + d.skills[n]))[:top]:
+        w(f"| {name} | {command_counts[name]} | {d.skills[name]} |")
 
     w("\n## Tools\n\n| tool | calls | errors | sessions | by main | by sub |\n| :-- | --: | --: | --: | --: | --: |")
     for label, t in sorted(d.tools.items(), key=lambda x: -x[1]["calls"])[: top + 10]:
         w(f"| {label} | {t['calls']} | {t['errors']} | {len(t['sessions'])} | {t['roles']['main']} | {t['roles']['sub']} |")
 
     w("\n## Repeated shell commands\n\nIdentical commands run in three or more sessions.\n\n| sessions | command |\n| --: | :-- |")
-    rows = sorted(((len(v), k) for k, v in d.bash.items() if len(v) >= 3), reverse=True)[:top]
-    for n, cmd in rows:
+    repeated_commands = sorted(((len(v), k) for k, v in d.bash.items() if len(v) >= 3), reverse=True)[:top]
+    for n, cmd in repeated_commands:
         w(f"| {n} | `{cmd}` |")
-    if not rows:
+    if not repeated_commands:
         w("| 0 | (none) |")
 
     w("\n## Repeated tool sequences\n\nThree-step sequences of the main agent, consecutive repeats collapsed, in three or more sessions.\n\n"
       "| sessions | sequence |\n| --: | :-- |")
     grams = collections.defaultdict(set)
     for s in sessions:
-        seq = [x for i, x in enumerate(s.labels) if i == 0 or x != s.labels[i - 1]]
+        seq = [x for i, x in enumerate(s.main_labels) if i == 0 or x != s.main_labels[i - 1]]
         for i in range(len(seq) - 2):
             g = tuple(seq[i : i + 3])
             if len(set(g)) >= 2:
@@ -471,8 +471,8 @@ def configuration(sessions):
     w("- Plugins: " + (", ".join(k for k, v in settings.get("enabledPlugins", {}).items() if v) or "(none)"))
     own, other = [], []
     for event, groups in settings.get("hooks", {}).items():
-        cmds = [h.get("command") or h.get("prompt") or h.get("type", "") for g in groups for h in g.get("hooks", [])]
-        mine = [re.sub(r".*\.claude/(scripts|skills)/([^/\"]+).*", r"\2", c) for c in cmds if re.search(r"\.claude/(scripts|skills)", c)]
+        hook_commands = [h.get("command") or h.get("prompt") or h.get("type", "") for g in groups for h in g.get("hooks", [])]
+        mine = [re.sub(r".*\.claude/(scripts|skills)/([^/\"]+).*", r"\2", c) for c in hook_commands if re.search(r"\.claude/(scripts|skills)", c)]
         (own if mine else other).append(f"{event} ({', '.join(mine)})" if mine else event)
     w("- Hooks with own scripts: " + (", ".join(own) or "(none)"))
     w("- Hooks with others' commands only: " + (", ".join(other) or "(none)"))
@@ -505,7 +505,7 @@ def dump(target, width):
     for rec in records(path):
         ts = (rec.get("timestamp") or "")[5:16].replace("T", " ")
         if rec["type"] == "user":
-            kind, text, command = request(rec)
+            kind, text, command = classify_user_record(rec)
             if command:
                 print(f"{ts} /{command}")
             if kind:
