@@ -12,12 +12,12 @@ Step 1. Decide the target language from the user's messages.
 Example: the message "この関数を説明して。英語で書いて" asks for English, so the target is English and an English reply is not drifted.
 - If no message decides the language, set "language" to "none" and drifted to false.
 Step 2. Decide the language of the reply's prose. Ignore code, commands, identifiers, file paths, quotations, proper nouns and technical terms; technical terms in another language inside prose are normal.
-Step 3. drifted is true only if the reply's prose language differs from the target language. If the reply has little or no prose (code or commands only, or very short), drifted is false.
+Step 3. drifted is true only if the reply's prose language differs from the target language. If the reply has no prose (code or commands only), drifted is false. A short status remark, such as one about progress or about what is being waited for, is prose and is judged like any other.
 
 Output only JSON: {"language": "<English name of the target language, or none>", "reply_language": "<English name of the reply's prose language, or none>", "drifted": boolean}`;
 
 const verdict = replyVerdict(ROLE, 10, (v) => typeof v?.drifted === "boolean" && typeof v.language === "string" && v.language !== "");
 
 if (verdict.drifted && verdict.language.toLowerCase() !== "none") {
-  block(`Your previous reply drifted from the user's language. Restate your previous reply in ${verdict.language}. Do not redo the work.`);
+  block(`Your previous reply drifted from the user's language. Restate your previous reply in ${verdict.language}. Do not redo the work. Write all later replies in ${verdict.language} as well, including short remarks made while working or waiting.`);
 }
