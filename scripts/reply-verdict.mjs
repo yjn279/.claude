@@ -8,8 +8,8 @@ const fail = (message) => {
 };
 
 // 発言の本文を返す。ユーザーが書いた地の文が無い行は空文字を返す。
-// 「Orca restarted」で始まる行は、Orca が再起動の後に自動で入れる定型文。
-const NOT_PROSE = /^(<task-notification>|<ci-monitor-event>|<local-command-stdout>|\[Request interrupted|<bash-input>|Orca restarted[.,] )/;
+// 「Orca restarted」「[Orca: 」で始まる行と、本文が「Continue where you left off.」だけの行は、Orca が会話へ自動で差し込む定型文。
+const NOT_PROSE = /^(<task-notification>|<ci-monitor-event>|<local-command-stdout>|\[Request interrupted|<bash-input>|Orca restarted[.,] |\[Orca: )|^Continue where you left off\.$/;
 const bodyOf = (row) => {
   if (row.type !== "user" || row.isMeta || row.isCompactSummary) return "";
   const { content } = row.message ?? {};
