@@ -21,19 +21,20 @@ async function compactIfLarge($: EngineInterface): Promise<void> {
   }
 }
 
-export const register: Register = on => {
-  let timer: Timer | undefined
-
-  on('turn.start', ($, e, next) => {
-    if (e.agentId === undefined) timer?.cancel()
-    return next(e)
-  })
-
-  on('turn.complete', ($, e, next) => {
-    if (e.agentId === undefined) {
-      timer?.cancel()
-      timer = $.clock.after(DELAY_MS, () => void compactIfLarge($))
-    }
-    return next(e)
-  })
+// Stopped: the handlers are commented out, so no timer is armed and nothing is compacted.
+export const register: Register = _on => {
+  // let timer: Timer | undefined
+  //
+  // on('turn.start', ($, e, next) => {
+  //   if (e.agentId === undefined) timer?.cancel()
+  //   return next(e)
+  // })
+  //
+  // on('turn.complete', ($, e, next) => {
+  //   if (e.agentId === undefined) {
+  //     timer?.cancel()
+  //     timer = $.clock.after(DELAY_MS, () => void compactIfLarge($))
+  //   }
+  //   return next(e)
+  // })
 }
